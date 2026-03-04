@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>班 シフト表</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          keyframes: {
+            'fade-in': { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+            'zoom-in-95': { '0%': { transform: 'scale(0.95)' }, '100%': { transform: 'scale(1)' } },
+            'slide-in-from-bottom-2': { '0%': { transform: 'translateY(0.5rem)' }, '100%': { transform: 'translateY(0)' } }
+          },
+          animation: {
+            'in': 'fade-in 0.2s ease-out',
+            'fade-in': 'fade-in 0.2s ease-out',
+            'zoom-in-95': 'zoom-in-95 0.2s ease-out'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React & ReactDOM (安定版CDN) -->
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <!-- Babel (JSXコンパイル用) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
+
+  <style>
+    /* 印刷時の設定：A4横、余白を削って1枚に収める */
+    @media print {
+      @page { size: A4 landscape; margin: 8mm; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: #fff; }
+      .print-hide-border { border: none !important; }
+      .print-opacity-100 { opacity: 1 !important; }
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  </style>
+</head>
+<body class="bg-slate-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    // ==========================================
+    // 🎨 アイコンコンポーネント
+    // ==========================================
+    const Icon = ({ size=24, className="", children }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+    );
+    const Settings = (p) => <Icon {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></Icon>;
+    const Trash2 = (p) => <Icon {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></Icon>;
+    const X = (p) => <Icon {...p}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></Icon>;
+    const ChevronLeft = (p) => <Icon {...p}><path d="m15 18-6-6 6-6"/></Icon>;
+    const ChevronRight = (p) => <Icon {...p}><path d="m9 18 6-6-6-6"/></Icon>;
+    const ChevronsLeft = (p) => <Icon {...p}><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></Icon>;
+    const ChevronsRight = (p) => <Icon {...p}><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></Icon>;
+    const Zap = (p) => <Icon {...p}><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></Icon>;
+    const AlertTriangle = (p) => <Icon {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></Icon>;
+    const Printer = (p) => <Icon {...p}><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect width="12" height="8" x="6" y="14" rx="1"/></Icon>;
+    const Lock = (p) => <Icon {...p}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>;
+    const Calendar = (p) => <Icon {...p}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></Icon>;
+    const User = (p) => <Icon {...p}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></Icon>;
+    const Layers = (p) => <Icon {...p}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></Icon>;
+    const Eraser = (p) => <Icon {...p}><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></Icon>;
+    const Snowflake = (p) => <Icon {...p}><line x1="2" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="22"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></Icon>;
+    const Loader = (p) => <Icon {...p} className={`${p.className} animate-spin`}><line x1="12" x2="12" y1="2" y2="6"/><line x1="12" x2="12" y1="18" y2="22"/><line x1="4.93" x2="7.76" y1="4.93" y2="7.76"/><line x1="16.24" x2="19.07" y1="16.24" y2="19.07"/><line x1="2" x2="6" y1="12" y2="12"/><line x1="18" x2="22" y1="12" y2="12"/><line x1="4.93" x2="7.76" y1="19.07" y2="16.24"/><line x1="16.24" x2="19.07" y1="7.76" y2="4.93"/></Icon>;
+    const ClipboardList = (p) => <Icon {...p}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></Icon>;
+    const Wand2 = (p) => <Icon {...p}><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></Icon>;
+    const AlertOctagon = (p) => <Icon {...p}><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></Icon>;
+    const Download = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></Icon>;
+    const Upload = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></Icon>;
+    const Smartphone = (p) => <Icon {...p}><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></Icon>;
+    const Monitor = (p) => <Icon {...p}><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></Icon>;
+    const Copy = (p) => <Icon {...p}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></Icon>;
+    const Sparkles = (p) => <Icon {...p}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></Icon>;
+    const Share2 = (p) => <Icon {...p}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></Icon>;
+    const Scale = (p) => <Icon {...p}><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></Icon>;
+    const HelpCircle = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></Icon>;
+    const BedDouble = (p) => <Icon {...p}><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></Icon>;
+
+    // ==========================================
+    // 🚀 MAIN LOGIC & COMPONENTS
+    // ==========================================
+    const STORAGE_KEY = 'postal_roster_2026_AI_SMART_V18_EMERGENCY';
+
+    const C = {
+      y: 'bg-yellow-50 text-yellow-700 border-yellow-200', o: 'bg-orange-50 text-orange-700 border-orange-200',
+      b: 'bg-blue-50 text-blue-700 border-blue-200', g: 'bg-gray-50 text-gray-600 border-gray-200',
+      gr: 'bg-green-50 text-green-700 border-green-200', p: 'bg-purple-50 text-purple-700 border-purple-200',
+      t: 'bg-teal-50 text-teal-800 border-teal-200', bl: 'bg-blue-50 text-blue-800 border-blue-200',
+      or1: 'bg-orange-50 text-orange-800 border-orange-200', or2: 'bg-orange-100 text-orange-800 border-orange-200',
+      ro_b: 'bg-rose-50 text-rose-800 border-rose-200 font-bold', pi_b: 'bg-pink-50 text-pink-800 border-pink-200 font-bold',
+      i_b: 'bg-indigo-50 text-indigo-800 border-indigo-200 font-bold', e_b: 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold',
+      cy_b: 'bg-cyan-50 text-cyan-800 border-cyan-200 font-bold', p_b: 'bg-purple-50 text-purple-800 border-purple-200 font-bold',
+      g_b: 'bg-gray-100 text-gray-700 border-gray-300 font-bold'
+    };
+
+    const ROLES = {
+      chief: { id: 'chief', name: '班長', short: '班', color: C.y, isLeader: true },
+      sub_chief: { id: 'sub_chief', name: '副班長', short: '副', color: C.o, isLeader: true },
+      expert: { id: 'expert', name: '主任', short: '主', color: C.b, isLeader: true },
+      regular: { id: 'regular', name: '一般', short: '般', color: C.g, isLeader: false },
+      new_regular: { id: 'new_regular', name: '新一般', short: '新', color: C.gr, isLeader: true },
+      contract: { id: 'contract', name: '期間雇用', short: '期', color: C.p, isLeader: false },
+    };
+
+    const STATUSES = [
+      { id: 'off', name: '週休', short: '休', color: 'text-red-600 bg-white border-red-200 font-bold ring-1 ring-red-100' }, 
+      { id: 'rest', name: '非番', short: '非', color: 'text-red-400 bg-white border-red-100 ring-1 ring-red-50' }, 
+      { id: 'plan_leave', name: '計年', short: '計', color: 'text-teal-600 bg-white border-teal-200 font-bold ring-1 ring-teal-100' }, 
+      { id: 'leave', name: '年休', short: '年', color: 'text-green-600 bg-white border-green-200 font-bold ring-1 ring-green-100' },
+      { id: 'req_off', name: '希望休', short: '希', color: 'text-purple-600 bg-purple-50 border-purple-200 font-bold ring-1 ring-purple-100' }
+    ];
+
+    const Utils = {
+      getSundayStart: () => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; },
+      addDays: (ds, n) => { const [y, m, d] = ds.split('-').map(Number); const dt = new Date(y, m - 1, d + n); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`; },
+      getKey: (ds, id) => `${ds}_${id}`,
+      isOff: (v) => !!v && STATUSES.some(s => s.id === v),
+      genId: () => 's' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      getDutyName: (id, duties) => duties.find(d => d.id === id)?.name || STATUSES.find(s => s.id === id)?.short || id || "",
+      getZone: (id, duties) => { const d = duties.find(x => x.id === id); return d && d.group.includes('区') ? d.group : null; }
+    };
+
+    const mkD = (n, m, col, grp, st=41) => Array.from({length: n}, (_, i) => ({ id: `d${m}_${i+1}`, name: `${st+i}`, group: grp, type: `type${m}`, color: col }));
+    const INITIAL_DUTIES = [
+      ...mkD(5, 5, C.t, '5人区'), ...mkD(6, 6, C.bl, '6人区'),
+      ...mkD(2, 7, C.or1, '7人区'), ...mkD(5, 7, C.or2, '7人区', 43).map((d,i)=>({ ...d, id: `d7_${i+3}` })),
+      { id: 'day_express_w', name: '平速', group: '早番', type: 'special', color: C.ro_b }, { id: 'day_express_h', name: '土日速', group: '早番', type: 'special', color: C.pi_b }, 
+      { id: 'night', name: '夜速', group: '夜勤', type: 'special', color: C.i_b }, { id: 'middle', name: '中勤', group: '遅番', type: 'special', color: C.e_b }, 
+      { id: 'matagi', name: 'またぎ', group: '特殊', type: 'special', color: C.cy_b }, { id: 'mc', name: 'MC', group: '特殊', type: 'special', color: C.p_b }
+    ];
+
+    const Button = ({ children, onClick, variant = 'secondary', size = 'md', className = '', disabled = false, title }) => {
+      const base = "inline-flex items-center justify-center font-bold transition-transform active:scale-95 rounded-lg disabled:opacity-50 shrink-0";
+      const v = { primary: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm", secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm", ghost: "text-slate-500 hover:bg-slate-100 hover:text-slate-700", danger: "bg-rose-600 text-white hover:bg-rose-700 shadow-sm" };
+      const s = { sm: "px-2 py-1 text-xs gap-1", md: "px-3 py-2 text-xs gap-1.5", lg: "px-4 py-2.5 text-sm gap-2" };
+      return ( <button onClick={onClick} disabled={disabled} title={title} className={`${base} ${v[variant]} ${s[size]} ${className}`}>{children}</button> );
+    };
+
+    const Modal = ({ isOpen, onClose, title, children, maxWidth = "max-w-4xl" }) => {
+      if (!isOpen) return null;
+      return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-2 md:p-4 animate-in fade-in zoom-in-95 print:hidden" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+          <div className={`bg-white w-full ${maxWidth} max-h-[95dvh] rounded-xl shadow-2xl flex flex-col overflow-hidden`} onMouseDown={e=>e.stopPropagation()}>
+            <div className="flex justify-between items-center px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 shrink-0">
+              <h3 className="text-base md:text-lg font-bold text-gray-800">{title}</h3>
+              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20}/></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/30">{children}</div>
+          </div>
+        </div>
+      );
+    };
+
+    const ConfigModal = ({ isOpen, onClose, data, actions }) => {
+      const [activeTab, setActiveTab] = useState('staff'); const [staffTab, setStaffTab] = useState('all'); const fileRef = useRef(null);
+      if (!isOpen) return null;
+      const { staffList, duties, currentDutyMode, isWinterMode, weekdayModesNormal, weekdayModesWinter, aiSimTime, tamatsukiSimTime } = data;
+      const { setStaffList, setCurrentDutyMode, setIsWinterMode, setWeekdayModesNormal, setWeekdayModesWinter, setAiSimTime, setTamatsukiSimTime, handleExport, handleImport, showConfirm } = actions;
+
+      const updateStaff = (id, k, v) => setStaffList(p => p.map(s => s.id === id ? { ...s, [k]: v } : s));
+      const toggleSkill = (sid, did) => setStaffList(p => p.map(s => { if (s.id !== sid) return s; const has = s.skills.includes(did), pref = s.preferred?.includes(did); let ns = [...s.skills], np = [...(s.preferred||[])]; if (!has) ns.push(did); else if (!pref) np.push(did); else { ns = ns.filter(x=>x!==did); np = np.filter(x=>x!==did); } return { ...s, skills: ns, preferred: np }; }));
+
+      return (
+        <Modal isOpen={isOpen} onClose={onClose} title="設定とガイド" maxWidth="max-w-5xl">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-6 h-auto md:h-[65vh]">
+            <div className="w-full md:w-56 flex flex-row md:flex-col gap-2 border-b md:border-b-0 md:border-r border-gray-100 pb-3 md:pb-0 md:pr-4 overflow-x-auto shrink-0 no-scrollbar">
+              {['staff','duty','data','help'].map(t => (
+                <button key={t} onClick={()=>setActiveTab(t)} className={`px-4 py-2 md:py-3 text-left rounded-xl font-bold transition-all flex items-center justify-center md:justify-start gap-2 whitespace-nowrap ${activeTab===t?'bg-indigo-50 text-indigo-700':'text-gray-500 hover:bg-gray-50'}`}>
+                  {t==='staff'?<><User size={16}/>スタッフ管理</>:t==='duty'?<><Layers size={16}/>区・班設定</>:t==='data'?<><Download size={16}/>データ管理</>:<><HelpCircle size={16}/>使い方ガイド</>}
+                </button>
+              ))}
+            </div>
+            <div className="flex-1 overflow-y-auto pr-1 md:pr-2 space-y-6 pb-20 md:pb-0">
+              {activeTab==='staff' && (
+                <>
+                  <div className="flex justify-between items-center sticky top-0 bg-slate-50/95 backdrop-blur z-10 py-2 border-b border-gray-100 mb-2">
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                      <button onClick={()=>setStaffTab('all')} className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${staffTab==='all'?'bg-slate-800 text-white':'bg-white text-slate-500'}`}>全て</button>
+                      {Object.entries(ROLES).map(([k,r])=><button key={k} onClick={()=>setStaffTab(k)} className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${staffTab===k?r.color:'bg-white text-slate-500'}`}>{r.name}</button>)}
+                    </div>
+                    <Button onClick={()=>setStaffList([...staffList,{id:Utils.genId(),name:'新規',role:staffTab==='all'?'regular':staffTab,skills:[],preferred:[],rules:{maxConsecutive:5},pairing:{avoid:[]}}])} variant="primary" size="sm">+ 追加</Button>
+                  </div>
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+                    {staffList.filter(s=>staffTab==='all'||s.role===staffTab).map(s=>(
+                      <div key={s.id} className="border border-gray-200 p-4 rounded-xl bg-white shadow-sm flex flex-col gap-2">
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                          <input value={s.name} onChange={e=>updateStaff(s.id,'name',e.target.value)} className="font-bold text-lg w-28 outline-none bg-transparent hover:bg-gray-50 focus:bg-gray-50 rounded px-1"/>
+                          <div className="flex items-center gap-1">
+                            <select value={s.role} onChange={e=>updateStaff(s.id,'role',e.target.value)} className="text-xs bg-gray-50 rounded p-1 outline-none font-bold text-slate-700">{Object.entries(ROLES).map(([k,r])=><option key={k} value={k}>{r.name}</option>)}</select>
+                            <button onClick={()=>showConfirm("削除しますか？", ()=>setStaffList(p=>p.filter(x=>x.id!==s.id)), true)} className="text-gray-300 hover:text-red-500 p-1 hover:bg-red-50 rounded"><Trash2 size={14}/></button>
+                          </div>
+                        </div>
+                        
+                        {/* 🔥 平日固定・全休チェックボックス */}
+                        <div className="flex gap-4 items-center mb-1">
+                          <label className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer px-1 hover:bg-gray-50 rounded"><input type="checkbox" checked={s.isFixed} onChange={e=>updateStaff(s.id,'isFixed',e.target.checked)} className="rounded text-indigo-500"/> 平日固定</label>
+                          <label className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer px-1 hover:bg-rose-50 rounded" title="この1ヶ月間パズルから完全に除外します"><input type="checkbox" checked={s.isAllOff} onChange={e=>updateStaff(s.id,'isAllOff',e.target.checked)} className="rounded text-rose-500"/> 全休(1ヶ月)</label>
+                        </div>
+                        
+                        <div className="text-[10px] text-gray-400 mb-1 mt-1 font-bold flex items-center justify-between"><span>スキル設定</span><span className="font-normal text-[9px] bg-amber-50 text-amber-600 px-1 rounded">2回タップで★優先</span></div>
+                        
+                        <div className="space-y-2">
+                          {['type5', 'type6', 'type7', 'special'].map(type => {
+                            const groupDuties = duties.filter(d => d.type === type);
+                            if (!groupDuties.length) return null;
+                            return (
+                              <div key={type}>
+                                <div className="text-[9px] text-gray-400 font-bold border-b border-gray-100 mb-1 leading-none pb-0.5">{type === 'special' ? '特殊業務' : type.replace('type', '') + '人区'}</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {groupDuties.map(d => (
+                                    <button key={d.id} onClick={()=>toggleSkill(s.id,d.id)} className={`text-[10px] px-2 py-1 rounded border transition-colors whitespace-nowrap ${s.skills.includes(d.id)?(s.preferred?.includes(d.id)?'bg-amber-100 text-amber-800 border-amber-300 ring-1 ring-amber-400 shadow-sm font-bold':`${d.color} shadow-sm`):'bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100'}`}>{s.preferred?.includes(d.id)&&<span className="text-amber-500 mr-0.5">★</span>}{d.name}</button>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              {activeTab==='duty' && (
+                <div className="space-y-6">
+                  <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                    <h4 className="font-bold mb-3 text-slate-800">基本体制</h4>
+                    <div className="flex flex-wrap gap-3 mb-5">{['type5','type6','type7'].map(m=><button key={m} onClick={()=>setCurrentDutyMode(m)} className={`flex-1 min-w-[80px] py-3 rounded-xl font-bold border transition-colors shadow-sm ${currentDutyMode===m?'bg-indigo-600 text-white border-indigo-700 ring-2 ring-indigo-200 ring-offset-1':'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>{m.replace('type','')}人区</button>)}</div>
+                    <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-gray-200">
+                      <span className="font-bold text-slate-700 flex items-center gap-2"><Snowflake size={16} className="text-cyan-500"/> 冬季モードを一括適用する</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" className="sr-only peer" checked={isWinterMode} onChange={e=>setIsWinterMode(e.target.checked)} />
+                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-cyan-500 transition-all after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+                      </label>
+                    </div>
+                    <div className="mt-4 p-4 border border-amber-200 bg-amber-50/50 rounded-lg">
+                      <h4 className="font-bold text-amber-800 flex items-center gap-2 mb-3"><Zap size={16}/> AI限界突破設定（思考時間）</h4>
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">AI作成 (ベース作り)</label>
+                          <select value={aiSimTime} onChange={e=>setAiSimTime(Number(e.target.value))} className="w-full py-1.5 px-2 border border-slate-300 rounded-md bg-white font-bold text-slate-700 outline-none shadow-sm cursor-pointer">
+                            <option value={5}>5秒 (サクッと)</option><option value={15}>15秒 (標準)</option><option value={30}>30秒 (じっくり)</option><option value={60}>60秒 (超じっくり)</option><option value={120}>120秒 (限界放置)</option>
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">仕上げ (玉突き)</label>
+                          <select value={tamatsukiSimTime} onChange={e=>setTamatsukiSimTime(Number(e.target.value))} className="w-full py-1.5 px-2 border border-slate-300 rounded-md bg-white font-bold text-slate-700 outline-none shadow-sm cursor-pointer">
+                            <option value={5}>5秒 (サクッと)</option><option value={15}>15秒 (標準)</option><option value={30}>30秒 (じっくり)</option><option value={60}>60秒 (超じっくり)</option><option value={120}>120秒 (限界放置)</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                     {[ {t:'通常', m:weekdayModesNormal, f:setWeekdayModesNormal}, {t:'冬季', m:weekdayModesWinter, f:setWeekdayModesWinter} ].map(({t,m,f}) => (
+                       <div key={t} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                         <h4 className="font-bold mb-4 text-sm text-slate-700">{t}時の曜日別体制</h4>
+                         <div className="space-y-2">
+                           {[1,2,3,4,5].map(dw=>(
+                             <div key={dw} className="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
+                               <span className="font-bold text-gray-500">{['','月','火','水','木','金'][dw]}曜</span>
+                               <select value={m[dw]||''} onChange={e=>f(p=>({...p,[dw]:e.target.value||null}))} className="py-1 px-2 border rounded-md bg-white font-bold text-slate-700 outline-none"><option value="">ベースに従う</option><option value="type5">5人区</option><option value="type6">6人区</option><option value="type7">7人区</option></select>
+                             </div>
+                           ))}
+                         </div>
+                         <label className="flex items-center gap-2 text-xs font-bold mt-4 text-slate-600 cursor-pointer"><input type="checkbox" checked={m.matagi} onChange={e=>f(p=>({...p,matagi:e.target.checked}))} className="rounded text-indigo-500"/> またぎ発生</label>
+                       </div>
+                     ))}
+                  </div>
+                </div>
+              )}
+              {activeTab==='data' && (
+                 <div className="grid gap-4 md:grid-cols-2">
+                   <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col items-start gap-4">
+                     <div className="flex items-center gap-2 font-bold text-lg text-indigo-800"><Download size={20}/> 全データ保存</div>
+                     <p className="text-xs text-gray-500">設定やシフトの入力状況など、すべての状態を一つのファイルとしてパソコン・スマホに保存します。</p>
+                     <Button onClick={()=>handleExport('all')} variant="primary" className="w-full mt-auto">ファイルを保存する</Button>
+                   </div>
+                   <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col items-start gap-4">
+                     <div className="flex items-center gap-2 font-bold text-lg text-teal-800"><Upload size={20}/> 全データ復元</div>
+                     <input type="file" ref={fileRef} className="hidden" accept=".json" onChange={e=>handleImport(e, 'all')}/>
+                     <p className="text-xs text-gray-500">保存したファイルを選択して、データをまるごと元に戻します。（現在のデータは上書きされます）</p>
+                     <Button onClick={()=>fileRef.current?.click()} className="w-full mt-auto text-teal-700 border-teal-200 hover:bg-teal-50"><Upload size={16}/> ファイルを読み込む</Button>
+                   </div>
+                 </div>
+              )}
+              {activeTab==='help' && (
+                <div className="space-y-6 text-slate-700 pb-10">
+                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <h4 className="font-bold mb-4 text-lg flex items-center gap-2 text-indigo-800"><Wand2 size={20}/> シフト作成の4ステップ</h4>
+                    <ol className="list-decimal list-inside space-y-4 text-sm leading-relaxed">
+                      <li><strong>休みの入力（手動ロック）</strong><br/><span className="text-gray-500 text-xs ml-5 block">各スタッフの「希望休」「年休」などを手動でスタンプします。手動で押したマスはAIによって絶対に書き換えられない「ロック状態」になります。</span></li>
+                      <li><strong>AI作成（ベース作り）</strong><br/><span className="text-gray-500 text-xs ml-5 block">右下の「AI作成」を押すと、AIが各スタッフのスキルと出勤体制を見て、全体に業務をばらまきます。この時、平日固定の人の休日は自動でロックされます。</span></li>
+                      <li><strong>仕上げ（玉突き・身代わり連鎖）</strong><br/><span className="text-gray-500 text-xs ml-5 block">まだ不足（赤色）が残っている場合、「仕上げ」を押します。AIが「Aさんのキツい業務を休みに変え、代わりにBさんがそこに入る」という現場さながらの玉突き連鎖を行い、穴を塞ぎます。</span></li>
+                      <li><strong>休み調整（帳尻合わせ）</strong><br/><span className="text-gray-500 text-xs ml-5 block">最後に「休み調整」を押します。手動の休みも含めて「休」と「非」の総数を数え、AIが自動で置いた文字だけを書き換えて、全体がぴったり半々（4回ずつなど）になるように綺麗に整えます。</span></li>
+                    </ol>
+                  </div>
+                  
+                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <h4 className="font-bold mb-4 text-lg flex items-center gap-2 text-rose-700"><AlertOctagon size={20}/> 平日固定と全休の「神ルール」</h4>
+                    <ul className="list-disc list-inside space-y-3 text-sm leading-relaxed">
+                      <li><strong>平日固定：</strong> チェックを入れると、AI作成を押した瞬間に<strong>土日祝のマスが「休」または「非」で完全ロック</strong>されます。平日は出勤枠として確保され、どの区を担当するかはAIがチームのバランスを見て割り当てます。</li>
+                      <li><strong>全休：</strong> 長期療養や出向などで1ヶ月パズルに参加しない人はこれにチェックを入れてください。自動で28日間すべてが「休」でロックされ、AIの計算対象から完全に外れます。</li>
+                      <li><strong className="text-rose-600">自動非常事態モード：</strong> 「全休」の人が1人でもいると、AIは残りのメンバーで表を完成させるため、自動的に「非常事態モード」に切り替わります。このモード中は、「夜勤明けの出勤（早番含む）」や「夜勤の連続」の制限が大幅に解除され、とにかく穴を埋めることを最優先に動きます。（※どんなに人が足りなくても「6連勤」だけは絶対にさせない安全装置が働いています）</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <h4 className="font-bold mb-4 text-lg flex items-center gap-2 text-teal-800"><Sparkles size={20}/> 知っておきたい隠しルール・機能</h4>
+                    <ul className="list-disc list-inside space-y-3 text-sm leading-relaxed">
+                      <li><strong>平日リーダー必須：</strong> 平日は必ず「班長・副班長・主任・新一般」の誰か1人以上が出勤するようにAIが計算します。</li>
+                      <li><strong>人に優しい夜勤明け：</strong> 夜勤の翌日は、可能な限り「休」か「非」になるようにAIが配慮します。（※非常事態モードを除く）</li>
+                      <li><strong>限界突破（思考時間）：</strong> 難しい月で穴が埋まらない時は、設定の「区・班設定」からAIの思考時間を「120秒」などに伸ばして放置してみてください。</li>
+                      <li><strong>長押しハイライト：</strong> 下のツールバーのスタンプを長押し（または右クリック）すると、表の中のその業務だけが明るく光り、全体のバランスが一目でわかります。</li>
+                      <li><strong>完成度シグナル：</strong> 表の上の日付の背景色は、<span className="text-emerald-600 font-bold">緑＝完璧</span>、<span className="text-yellow-600 font-bold">黄＝ダブりあり</span>、<span className="text-red-600 font-bold">赤＝不足あり</span> を表しています。</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
+      );
+    };
+
+    const DailyListModal = ({ isOpen, onClose, dateStr, staffList, rosterData, duties }) => {
+      if (!isOpen) return null;
+      const listText = staffList.map(s => {
+        const v = rosterData[Utils.getKey(dateStr, s.id)];
+        if (!v || Utils.isOff(v)) return null;
+        return `${s.name} : ${Utils.getDutyName(v, duties)}`;
+      }).filter(Boolean).join('\n');
+
+      return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`${dateStr} 朝礼用リスト`} maxWidth="max-w-sm">
+          <div className="space-y-4">
+            <textarea readOnly value={listText || "出勤者なし"} className="w-full h-64 p-4 text-sm bg-white border border-gray-300 rounded-xl outline-none resize-none font-mono shadow-inner"/>
+            <Button onClick={()=>{navigator.clipboard.writeText(listText); alert('コピーしました');}} className="w-full py-3" variant="primary"><Copy size={18}/> クリップボードにコピー</Button>
+          </div>
+        </Modal>
+      );
+    };
+
+    const DaySettingModal = ({ isOpen, onClose, dateStr, isHol, customMode, onToggleHol, onSetMode }) => {
+      if (!isOpen) return null;
+      return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`${dateStr} の設定`} maxWidth="max-w-xs">
+          <div className="space-y-4">
+            <label className="flex items-center justify-between font-bold text-gray-700 cursor-pointer p-4 bg-white border border-gray-200 shadow-sm rounded-xl hover:bg-rose-50 transition-colors">
+              <span className="flex items-center gap-2"><Calendar size={18} className="text-rose-500"/> 祝日扱いにする</span>
+              <input type="checkbox" checked={isHol} onChange={onToggleHol} className="w-5 h-5 text-rose-500 rounded focus:ring-rose-500"/>
+            </label>
+            <div className="p-4 bg-white border border-gray-200 shadow-sm rounded-xl">
+              <span className="flex items-center gap-2 font-bold text-gray-700 mb-3"><Layers size={18} className="text-indigo-500"/> この日だけの体制</span>
+              <select value={customMode||''} onChange={e=>onSetMode(e.target.value||null)} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none font-bold text-slate-700 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20">
+                <option value="">自動（ベースに従う）</option><option value="type5">5人区</option><option value="type6">6人区</option><option value="type7">7人区</option>
+              </select>
+            </div>
+            <Button onClick={onClose} variant="primary" className="w-full py-3">完了</Button>
+          </div>
+        </Modal>
+      );
+    };
+
+// --- 前半ここまで ---
+    function App() {
+      const [startDateStr, setStartDateStr] = useState(Utils.getSundayStart());
+      const daysToShow = 28;
+      
+      const [staffList, setStaffList] = useState([]);
+      const [duties, setDuties] = useState(INITIAL_DUTIES);
+      const [currentDutyMode, setCurrentDutyMode] = useState('type6');
+      const [isWinterMode, setIsWinterMode] = useState(false);
+      const [weekdayModesNormal, setWeekdayModesNormal] = useState({ 1: null, 2: null, 3: null, 4: null, 5: null, matagi: false });
+      const [weekdayModesWinter, setWeekdayModesWinter] = useState({ 1: 'type7', 2: 'type7', 3: 'type7', 4: 'type7', 5: 'type7', matagi: true });
+      
+      const [aiSimTime, setAiSimTime] = useState(15); 
+      const [tamatsukiSimTime, setTamatsukiSimTime] = useState(15);
+      
+      const [rosterData, setRosterData] = useState({});
+      const [lockedCells, setLockedCells] = useState({});
+      const [holidayMap, setHolidayMap] = useState({});
+      const [dailyModeOverrides, setDailyModeOverrides] = useState({});
+      
+      const [activeModal, setActiveModal] = useState(null);
+      const [daySettingTarget, setDaySettingTarget] = useState(null);
+      const [mobileSelectedStaffId, setMobileSelectedStaffId] = useState(null);
+      const [viewMode, setViewMode] = useState('pc'); 
+      const [penMode, setPenMode] = useState(null);
+      const [toolCategory, setToolCategory] = useState('status');
+      
+      const [simulationStatus, setSimulationStatus] = useState("");
+      const [simulationProgress, setSimulationProgress] = useState(0);
+      
+      const [dialog, setDialog] = useState(null);
+      const [highlightDuty, setHighlightDuty] = useState(null);
+      const longPressTimer = useRef(null);
+
+      const showAlert = useCallback((message, title="") => setDialog({ message, onConfirm:()=>{}, isAlert:true, title }), []);
+      const showConfirm = useCallback((message, onConfirm, isDanger=false, title="") => setDialog({ message, onConfirm, isAlert:false, isDanger, title }), []);
+
+      useEffect(() => {
+        try {
+          const s = localStorage.getItem(STORAGE_KEY);
+          if (s) {
+            const p = JSON.parse(s);
+            if (p.stfs) setStaffList(p.stfs);
+            if (p.cdm) setCurrentDutyMode(p.cdm);
+            if (p.iw !== undefined) setIsWinterMode(p.iw);
+            if (p.wmn) setWeekdayModesNormal(p.wmn);
+            if (p.wmw) setWeekdayModesWinter(p.wmw);
+            if (p.r) setRosterData(p.r);
+            if (p.l) setLockedCells(p.l);
+            if (p.h) setHolidayMap(p.h);
+            if (p.dmo) setDailyModeOverrides(p.dmo);
+            if (p.aiSimTime) setAiSimTime(p.aiSimTime);
+            if (p.tamaSimTime) setTamatsukiSimTime(p.tamaSimTime);
+          }
+        } catch(e) {}
+      }, []);
+
+      useEffect(() => {
+        // 🔥 過去データに「他(other)」が残っていた場合の安全な除去
+        const cleanRoster = { ...rosterData };
+        let modified = false;
+        Object.keys(cleanRoster).forEach(k => {
+          if (cleanRoster[k] === 'other') {
+            delete cleanRoster[k];
+            modified = true;
+          }
+        });
+        if (modified) setRosterData(cleanRoster);
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          stfs: staffList, duties, cdm: currentDutyMode, iw: isWinterMode, wmn: weekdayModesNormal, wmw: weekdayModesWinter,
+          r: modified ? cleanRoster : rosterData, l: lockedCells, h: holidayMap, dmo: dailyModeOverrides, aiSimTime, tamaSimTime: tamatsukiSimTime
+        }));
+      }, [staffList, duties, currentDutyMode, isWinterMode, weekdayModesNormal, weekdayModesWinter, rosterData, lockedCells, holidayMap, dailyModeOverrides, aiSimTime, tamatsukiSimTime]);
+
+      const datesList = useMemo(() => { 
+        const l = []; let c = startDateStr; 
+        for (let i=0; i<daysToShow; i++) { 
+          const dt = new Date(c); l.push({ dateStr: c, dayNum: dt.getDate(), dayOfWeek: dt.getDay(), dayLabel: ['日','月','火','水','木','金','土'][dt.getDay()] }); 
+          c = Utils.addDays(c, 1); 
+        } return l; 
+      }, [startDateStr, daysToShow]);
+
+      const canDo = useCallback((staff, duty) => {
+          return !duty || Utils.isOff(duty) || staff.skills.includes(duty);
+      }, []);
+
+      // 🔥 【防護壁】その日に存在して良い業務のリスト（許可リスト）
+      const getValidNeedsTypes = useCallback((dateStr, dayOfWeek, isHol, currentWModes, currentDutyMode) => {
+          const mode = dailyModeOverrides[dateStr] || ( (!isHol && dayOfWeek >= 1 && dayOfWeek <= 5) ? currentWModes[dayOfWeek] : null ) || currentDutyMode;
+          let needs = [];
+          if (isHol || dayOfWeek === 0) needs = ['day_express_h', 'day_express_h', 'night'];
+          else if (dayOfWeek === 6) needs = ['day_express_h', 'day_express_h', 'middle', 'night'];
+          else {
+            needs = [...duties.filter(x => x.type === mode).map(x => x.id), 'day_express_w', 'night', 'mc'];
+            if (currentWModes.matagi) needs.push('matagi');
+          }
+          return [...new Set(needs)];
+      }, [duties, dailyModeOverrides]);
+
+      // 🔥 【神の採点基準】
+      const evaluate = useCallback((roster) => {
+        let score = 0;
+        const currentWModes = isWinterMode ? weekdayModesWinter : weekdayModesNormal;
+        
+        // 🚨 全休者がいるかどうかの判定（非常事態モードフラグ）
+        const isEmergency = staffList.some(s => s.isAllOff);
+
+        const dailyStaffDutyMap = {};
+        datesList.forEach(d => { dailyStaffDutyMap[d.dateStr] = {}; });
+        staffList.forEach(s => {
+            datesList.forEach(d => {
+                const v = roster[Utils.getKey(d.dateStr, s.id)];
+                if (v && !Utils.isOff(v)) dailyStaffDutyMap[d.dateStr][s.id] = v;
+            });
+        });
+        
+        staffList.forEach(s => {
+          let workStreak = 0; let offStreak = 0;
+          let nightStreak = 0; let offCountEval = 0; let restCountEval = 0;
+          let currentOffStreak = 0;
+
+          for (let i = 0; i < datesList.length; i++) {
+            const d = datesList[i]; const ds = d.dateStr;
+            const v = roster[Utils.getKey(ds, s.id)];
+            const isOff = Utils.isOff(v);
+            
+            if (v === 'off') offCountEval++;
+            if (v === 'rest') restCountEval++;
+            
+            // 🛑 【絶対ルール1】全休者の抜け道完全封鎖
+            if (s.isAllOff) {
+                if (!isOff && v !== 'leave' && v !== 'plan_leave' && v !== 'req_off') score += 10000000;
+            }
+            // 🛑 【絶対ルール2】平日固定の抜け道完全封鎖
+            else if (s.isFixed) {
+                const isHol = !!holidayMap[ds] || d.dayOfWeek === 0 || d.dayOfWeek === 6;
+                if (isHol) {
+                    if (v !== 'off' && v !== 'rest' && v !== 'leave' && v !== 'plan_leave' && v !== 'req_off') score += 10000000;
+                } else {
+                    if (v === 'off' || v === 'rest') score += 10000000;
+                }
+            }
+
+            if (!v) {
+                // 🛑 空白は絶対に許さない（生成で埋めるため）
+                score += 1000000;
+                workStreak = 0;
+                currentOffStreak = 0;
+            } else if (!isOff) {
+                workStreak++;
+                currentOffStreak = 0;
+
+                if (!s.skills.includes(v)) score += 1000000;
+
+                if (v === 'night') {
+                    nightStreak++;
+                    // 🚨 【緩和ルール】夜勤の連続（非常事態は500点に激減）
+                    if (nightStreak >= 3) score += isEmergency ? 500 : 50000;
+                } else {
+                    nightStreak = 0;
+                }
+
+                if (i > 0) {
+                    const prevV = roster[Utils.getKey(datesList[i-1].dateStr, s.id)];
+                    if (prevV === 'night') {
+                        // 🚨 【緩和ルール】夜勤明けのケア（非常事態は何が来てもOK）
+                        if (v === 'day_express_w' || v === 'day_express_h') score += isEmergency ? 500 : 50000;
+                        else if (!isOff) score += isEmergency ? 100 : 10000;
+                    }
+                    if (prevV === 'middle') {
+                        if (v === 'day_express_w' || v === 'day_express_h') score += isEmergency ? 500 : 50000;
+                    }
+                }
+            } else { 
+                nightStreak = 0;
+                currentOffStreak++;
+                // 🌟 激務後の連休ボーナス
+                if (currentOffStreak === 2 && workStreak >= 4) score -= 5000;
+                workStreak = 0; 
+            }
+
+            // 🛑 6連勤絶対禁止（非常事態でも絶対禁止）、5・4連勤は超許容
+            if (workStreak >= 6) score += 10000000;
+            else if (workStreak === 5) score += 10; 
+            else if (workStreak === 4) score += 10; 
+          }
+          
+          if (workStreak >= 6) score += 10000000;
+          else if (workStreak === 5) score += 10;
+          
+          if (!s.isFixed && !s.isAllOff) {
+              const totalOffs = offCountEval + restCountEval;
+              if (totalOffs < 8) score += (8 - totalOffs) * 10000000;
+          }
+        });
+
+        datesList.forEach(d => {
+           const ds = d.dateStr;
+           const isHol = !!holidayMap[ds];
+           const mode = dailyModeOverrides[ds] || ( (!isHol && d.dayOfWeek >= 1 && d.dayOfWeek <= 5) ? currentWModes[d.dayOfWeek] : null ) || currentDutyMode;
+           
+           // 🔥 許可リストの取得
+           const validNeedsTypes = getValidNeedsTypes(ds, d.dayOfWeek, isHol, currentWModes, currentDutyMode);
+           
+           let needs = [];
+           if (isHol || d.dayOfWeek === 0) needs = ['day_express_h', 'day_express_h', 'night'];
+           else if (d.dayOfWeek === 6) needs = ['day_express_h', 'day_express_h', 'middle', 'night'];
+           else {
+             needs = [...duties.filter(x => x.type === mode).map(x => x.id), 'day_express_w', 'night', 'mc'];
+             if (currentWModes.matagi) needs.push('matagi');
+           }
+           
+           const needsCounts = {}; needs.forEach(n => needsCounts[n] = (needsCounts[n] || 0) + 1);
+           const actualCounts = {};
+           
+           staffList.forEach(s => {
+               if (s.isAllOff) return; // 全休者は業務計算に入れない
+               const v = dailyStaffDutyMap[ds][s.id];
+               if (v) actualCounts[v] = (actualCounts[v] || 0) + 1;
+               
+               if (v && s.pairing?.avoid?.length) {
+                   s.pairing.avoid.forEach(avId => {
+                       if (dailyStaffDutyMap[ds][avId] === v) score += 10000;
+                   });
+               }
+           });
+
+           // 🛑 【平日リーダー必須ルール】
+           if (!isHol && d.dayOfWeek >= 1 && d.dayOfWeek <= 5) {
+               let hasLeader = false;
+               staffList.forEach(s => {
+                   if (!s.isAllOff && dailyStaffDutyMap[ds][s.id] && ROLES[s.role]?.isLeader) hasLeader = true;
+               });
+               if (!hasLeader) score += 500000;
+           }
+
+           // 業務不足
+           Object.keys(needsCounts).forEach(n => {
+               const need = needsCounts[n]; const actual = actualCounts[n] || 0;
+               if (actual < need) score += (need - actual) * 100000;
+           });
+
+           Object.keys(actualCounts).forEach(a => {
+               // 🛑 【異物混入ブロック】許可リストにない業務が存在したら即ボツ
+               if (!validNeedsTypes.includes(a)) {
+                   score += 10000000; 
+               } else {
+                   // 許可リストにある業務なら、ダブりペナルティはわずか10点（超許容）
+                   const need = needsCounts[a] || 0; 
+                   const actual = actualCounts[a];
+                   if (actual > need) score += (actual - need) * 10; 
+               }
+           });
+        });
+
+        return score;
+      }, [staffList, datesList, duties, holidayMap, dailyModeOverrides, isWinterMode, weekdayModesWinter, weekdayModesNormal, currentDutyMode, canDo, getValidNeedsTypes]);
+
+      // ==========================================
+      // 🤖 AI作成（初期配置と生成アクション）
+      // ==========================================
+      const executeAutoAssign = () => {
+        if (!staffList.length) return;
+        const isEmergency = staffList.some(s => s.isAllOff);
+        setSimulationStatus(`AI作成中...${isEmergency ? '(非常事態モード)' : ''}`);
+        setSimulationProgress(0);
+
+        let tr = { ...rosterData };
+        const locked = { ...lockedCells };
+
+        datesList.forEach(d => staffList.forEach(s => { 
+            const k = Utils.getKey(d.dateStr, s.id); 
+            if (!locked[k]) delete tr[k]; 
+        }));
+
+        // 🔥 【全休・平日固定の完全ロック（下準備）】
+        staffList.forEach(s => {
+          if (s.isAllOff) {
+              datesList.forEach(d => {
+                  const k = Utils.getKey(d.dateStr, s.id);
+                  if (!locked[k] && !tr[k]) {
+                      tr[k] = Math.random() > 0.5 ? 'off' : 'rest';
+                      locked[k] = true; // AIに絶対に触れさせない
+                  }
+              });
+              return; 
+          }
+          if (s.isFixed) {
+              datesList.forEach(d => {
+                  const isHol = holidayMap[d.dateStr] || d.dayOfWeek === 0 || d.dayOfWeek === 6;
+                  const k = Utils.getKey(d.dateStr, s.id);
+                  if (isHol && !locked[k] && !tr[k]) {
+                      tr[k] = Math.random() > 0.5 ? 'off' : 'rest';
+                      locked[k] = true; 
+                  }
+              });
+              return; 
+          }
+          
+          let offCount = 0; let restCount = 0;
+          datesList.forEach(d => {
+            const v = tr[Utils.getKey(d.dateStr, s.id)];
+            if (v === 'off') offCount++; if (v === 'rest') restCount++;
+          });
+          let availableDates = datesList.map(d => d.dateStr).filter(ds => { const k = Utils.getKey(ds, s.id); return !locked[k] && !tr[k]; });
+          availableDates.sort(() => Math.random() - 0.5); 
+          
+          while (offCount < 4 && availableDates.length > 0) { tr[Utils.getKey(availableDates.pop(), s.id)] = 'off'; offCount++; }
+          while (restCount < 4 && availableDates.length > 0) { tr[Utils.getKey(availableDates.pop(), s.id)] = 'rest'; restCount++; }
+        });
+
+        const currentWModes = isWinterMode ? weekdayModesWinter : weekdayModesNormal;
+        datesList.forEach(d => {
+          const isHol = !!holidayMap[d.dateStr];
+          const mode = dailyModeOverrides[d.dateStr] || ( (!isHol && d.dayOfWeek >= 1 && d.dayOfWeek <= 5) ? currentWModes[d.dayOfWeek] : null ) || currentDutyMode;
+          const validNeedsTypes = getValidNeedsTypes(d.dateStr, d.dayOfWeek, isHol, currentWModes, currentDutyMode);
+          
+          let needs = [];
+          if (isHol || d.dayOfWeek === 0) needs = ['day_express_h', 'day_express_h', 'night'];
+          else if (d.dayOfWeek === 6) needs = ['day_express_h', 'day_express_h', 'middle', 'night'];
+          else { needs = [...duties.filter(x => x.type === mode).map(x => x.id), 'day_express_w', 'night', 'mc']; if (currentWModes.matagi) needs.push('matagi'); }
+          
+          staffList.forEach(s => { 
+              if(s.isAllOff) return;
+              const v = tr[Utils.getKey(d.dateStr, s.id)]; 
+              if (!!v && !Utils.isOff(v)) { const idx = needs.indexOf(v); if (idx !== -1) needs.splice(idx, 1); } 
+          });
+
+          // 全休者を除外した名簿
+          let availableStaff = staffList.filter(s => !s.isAllOff && !tr[Utils.getKey(d.dateStr, s.id)] && !locked[Utils.getKey(d.dateStr, s.id)]).sort(() => Math.random() - 0.5);
+          
+          // 🔥 【他を使わない生成ロジック】
+          availableStaff.forEach(s => {
+            const k = Utils.getKey(d.dateStr, s.id);
+            if (needs.length > 0) {
+              const validNeedIdx = needs.findIndex(n => s.skills.includes(n));
+              if (validNeedIdx !== -1) tr[k] = needs.splice(validNeedIdx, 1)[0];
+              else {
+                const validSkills = s.skills.filter(sk => validNeedsTypes.includes(sk));
+                if (validSkills.length > 0) tr[k] = validSkills[Math.floor(Math.random() * validSkills.length)];
+              }
+            } else {
+              const validSkills = s.skills.filter(sk => validNeedsTypes.includes(sk));
+              if (validSkills.length > 0) tr[k] = validSkills[Math.floor(Math.random() * validSkills.length)];
+            }
+          });
+        });
+
+        let currentScore = evaluate(tr);
+        let bestRoster = { ...tr };
+        let bestScore = currentScore;
+        
+        const MAX_ITERATIONS = 500000000; 
+        const MAX_TIME_MS = aiSimTime * 1000; 
+        const BATCH_SIZE = 5000;       
+        const startTime = Date.now(); 
+        let iterations = 0; let lastProgress = 0;
+        const workingStaffs = staffList.filter(s => !s.isAllOff); // 計算用名簿
+
+        const optimizeBatch = () => {
+           for (let i = 0; i < BATCH_SIZE; i++) {
+              if (currentScore === 0 || iterations >= MAX_ITERATIONS || workingStaffs.length === 0) break;
+              iterations++;
+
+              const isPatternA = Math.random() > 0.5; let k1, k2; let s1, s2;
+              let d1Obj, d2Obj;
+
+              if (isPatternA) {
+                 d1Obj = datesList[Math.floor(Math.random() * datesList.length)];
+                 d2Obj = d1Obj;
+                 s1 = workingStaffs[Math.floor(Math.random() * workingStaffs.length)];
+                 s2 = workingStaffs[Math.floor(Math.random() * workingStaffs.length)];
+                 if (s1.id === s2.id) continue;
+                 k1 = Utils.getKey(d1Obj.dateStr, s1.id);
+                 k2 = Utils.getKey(d2Obj.dateStr, s2.id);
+                 if (locked[k1] || locked[k2]) continue;
+              } else {
+                 const sid = workingStaffs[Math.floor(Math.random() * workingStaffs.length)].id;
+                 s1 = workingStaffs.find(x=>x.id===sid); s2 = s1;
+                 d1Obj = datesList[Math.floor(Math.random() * datesList.length)];
+                 d2Obj = datesList[Math.floor(Math.random() * datesList.length)];
+                 if (d1Obj.dateStr === d2Obj.dateStr) continue; 
+                 k1 = Utils.getKey(d1Obj.dateStr, sid);
+                 k2 = Utils.getKey(d2Obj.dateStr, sid);
+                 if (locked[k1] || locked[k2]) continue;
+              }
+
+              const v1 = tr[k1]; const v2 = tr[k2];
+              if (v1 === v2) continue; 
+              if (isPatternA && (Utils.isOff(v1) || Utils.isOff(v2))) continue;
+              if (v2 && !canDo(s1, v2)) continue;
+              if (v1 && !canDo(s2, v1)) continue;
+
+              // 🔥 【異物ブロック】
+              const validNeeds1 = getValidNeedsTypes(d1Obj.dateStr, d1Obj.dayOfWeek, !!holidayMap[d1Obj.dateStr], currentWModes, currentDutyMode);
+              const validNeeds2 = getValidNeedsTypes(d2Obj.dateStr, d2Obj.dayOfWeek, !!holidayMap[d2Obj.dateStr], currentWModes, currentDutyMode);
+              
+              if (v1 && !Utils.isOff(v1) && !validNeeds2.includes(v1)) continue; 
+              if (v2 && !Utils.isOff(v2) && !validNeeds1.includes(v2)) continue; 
+
+              tr[k1] = v2; tr[k2] = v1;
+              const newScore = evaluate(tr);
+
+              if (newScore <= currentScore) {
+                currentScore = newScore; if (newScore < bestScore) { bestScore = newScore; bestRoster = { ...tr }; }
+              } else { tr[k1] = v1; tr[k2] = v2; }
+           }
+           
+           const elapsed = Date.now() - startTime;
+           const currentProgress = Math.min(100, Math.floor((elapsed / MAX_TIME_MS) * 100));
+           if (currentProgress > lastProgress + 2) {
+               setSimulationProgress(currentProgress);
+               lastProgress = currentProgress;
+           }
+
+           if (iterations < MAX_ITERATIONS && elapsed < MAX_TIME_MS && currentScore > 0) {
+             requestAnimationFrame(optimizeBatch);
+           } else { setRosterData(bestRoster); setSimulationStatus(""); setSimulationProgress(0); }
+        };
+        requestAnimationFrame(optimizeBatch);
+      };
+
+      // ==========================================
+      // 🧩 仕上げ（玉突き＆身代わり連鎖）
+      // ==========================================
+      const executeTamatsuki = () => {
+        if (!staffList.length) return;
+        setSimulationStatus(`パズル玉突き中...`);
+        setSimulationProgress(0);
+
+        let tr = { ...rosterData };
+        let currentScore = evaluate(tr); let bestRoster = { ...tr }; let bestScore = currentScore;
+        const locked = { ...lockedCells };
+        
+        const MAX_TIME_MS = tamatsukiSimTime * 1000; 
+        const MAX_ITERATIONS = 500000000;
+        const BATCH_SIZE = 2000;
+        const startTime = Date.now();
+        let iterations = 0; let lastProgress = 0;
+        const currentWModes = isWinterMode ? weekdayModesWinter : weekdayModesNormal;
+        const workingStaffs = staffList.filter(s => !s.isAllOff); // 全休除外
+
+        const optimizeBatch = () => {
+           for (let i = 0; i < BATCH_SIZE; i++) {
+              if (currentScore === 0 || iterations >= MAX_ITERATIONS || workingStaffs.length === 0) break;
+              iterations++;
+              
+              const d1Obj = datesList[Math.floor(Math.random() * datesList.length)];
+              const ds = d1Obj.dateStr;
+              const isHol = !!holidayMap[ds];
+              
+              const validNeedsTypes = getValidNeedsTypes(ds, d1Obj.dayOfWeek, isHol, currentWModes, currentDutyMode);
+              
+              const mode = dailyModeOverrides[ds] || ( (!isHol && d1Obj.dayOfWeek >= 1 && d1Obj.dayOfWeek <= 5) ? currentWModes[d1Obj.dayOfWeek] : null ) || currentDutyMode;
+              let needs = [];
+              if (isHol || d1Obj.dayOfWeek === 0) needs = ['day_express_h', 'day_express_h', 'night'];
+              else if (d1Obj.dayOfWeek === 6) needs = ['day_express_h', 'day_express_h', 'middle', 'night'];
+              else {
+                needs = [...duties.filter(x => x.type === mode).map(x => x.id), 'day_express_w', 'night', 'mc'];
+                if (currentWModes.matagi) needs.push('matagi');
+              }
+
+              const needsCounts = {}; needs.forEach(n => needsCounts[n] = (needsCounts[n] || 0) + 1);
+              let as = workingStaffs.map(s => ({ staff: s, duty: tr[Utils.getKey(ds, s.id)] })).filter(x => !!x.duty && !Utils.isOff(x.duty) && !locked[Utils.getKey(ds, x.staff.id)]);
+              const actualCounts = {}; as.forEach(x => actualCounts[x.duty] = (actualCounts[x.duty] || 0) + 1);
+
+              const missing = Object.keys(needsCounts).filter(n => (actualCounts[n] || 0) < needsCounts[n]);
+
+              // 🔥 【1. 穴埋め生成アクション】
+              const blankStaffs = workingStaffs.filter(s => !tr[Utils.getKey(ds, s.id)] && !locked[Utils.getKey(ds, s.id)]);
+              if (blankStaffs.length > 0 && missing.length > 0) {
+                  const bStaff = blankStaffs[Math.floor(Math.random() * blankStaffs.length)];
+                  const targetMissing = missing[Math.floor(Math.random() * missing.length)];
+                  if (canDo(bStaff, targetMissing) && validNeedsTypes.includes(targetMissing)) {
+                      const k_b = Utils.getKey(ds, bStaff.id);
+                      tr[k_b] = targetMissing;
+                      let newScore = evaluate(tr);
+                      if (newScore < currentScore) { currentScore = newScore; if(newScore<bestScore){bestScore=newScore;bestRoster={...tr};} continue; }
+                      tr[k_b] = undefined; 
+                  }
+              }
+
+              // 🔥 【2. 身代わりの玉突き連鎖アクション】
+              if (Math.random() > 0.8 && missing.length > 0) {
+                  const targetMissing = missing[Math.floor(Math.random() * missing.length)];
+                  const staffA = workingStaffs.find(s => !s.isFixed && canDo(s, targetMissing) && !locked[Utils.getKey(ds, s.id)] && Utils.isOff(tr[Utils.getKey(ds, s.id)]));
+                  
+                  if (staffA) {
+                      const d2Obj = datesList.find(d => {
+                         const k = Utils.getKey(d.dateStr, staffA.id);
+                         return d.dateStr !== ds && !locked[k] && tr[k] && !Utils.isOff(tr[k]);
+                      });
+                      
+                      if (d2Obj) {
+                          const kA_d1 = Utils.getKey(ds, staffA.id);
+                          const kA_d2 = Utils.getKey(d2Obj.dateStr, staffA.id);
+                          const dutyY = tr[kA_d2]; 
+                          
+                          const staffB = workingStaffs.find(s => s.id !== staffA.id && canDo(s, dutyY) && !locked[Utils.getKey(d2Obj.dateStr, s.id)]);
+                          
+                          if (staffB) {
+                              const kB_d2 = Utils.getKey(d2Obj.dateStr, staffB.id);
+                              const oldA1 = tr[kA_d1]; const oldA2 = tr[kA_d2]; const oldB2 = tr[kB_d2];
+                              
+                              tr[kA_d1] = targetMissing; // Aさんが穴を埋める
+                              tr[kA_d2] = 'rest';        // Aさんを休ませる
+                              tr[kB_d2] = dutyY;         // Bさんがカバーする
+
+                              let newScore = evaluate(tr);
+                              if (newScore < currentScore) { 
+                                  currentScore = newScore; if(newScore<bestScore){bestScore=newScore;bestRoster={...tr};} 
+                                  continue; 
+                              }
+                              tr[kA_d1] = oldA1; tr[kA_d2] = oldA2; tr[kB_d2] = oldB2;
+                          }
+                      }
+                  }
+              }
+
+              // 【3. 通常の交換】
+              if (Math.random() > 0.5) {
+                  const s1 = workingStaffs[Math.floor(Math.random() * workingStaffs.length)];
+                  const s2 = workingStaffs[Math.floor(Math.random() * workingStaffs.length)];
+                  if (s1.id !== s2.id) {
+                      const k1 = Utils.getKey(ds, s1.id), k2 = Utils.getKey(ds, s2.id);
+                      if (!locked[k1] && !locked[k2]) {
+                          const v1 = tr[k1], v2 = tr[k2];
+                          if (!Utils.isOff(v1) && !Utils.isOff(v2)) {
+                              if (v1 !== v2 && canDo(s1, v2) && canDo(s2, v1)) {
+                                  tr[k1] = v2; tr[k2] = v1;
+                                  let newScore = evaluate(tr);
+                                  if (newScore < currentScore) { currentScore = newScore; if(newScore<bestScore){bestScore=newScore;bestRoster={...tr};} }
+                                  else { tr[k1] = v1; tr[k2] = v2; }
+                              }
+                          }
+                      }
+                  }
+              } else {
+                  const sid = workingStaffs[Math.floor(Math.random() * workingStaffs.length)].id;
+                  const s1 = workingStaffs.find(x => x.id === sid);
+                  const d2Obj = datesList[Math.floor(Math.random() * datesList.length)];
+                  if (d1Obj.dateStr === d2Obj.dateStr) continue; 
+                  const k1 = Utils.getKey(d1Obj.dateStr, sid);
+                  const k2 = Utils.getKey(d2Obj.dateStr, sid);
+                  
+                  if (!locked[k1] && !locked[k2]) {
+                      const v1 = tr[k1]; const v2 = tr[k2];
+                      if (v1 !== v2 && canDo(s1, v2) && canDo(s1, v1)) {
+                          
+                          const validNeeds2 = getValidNeedsTypes(d2Obj.dateStr, d2Obj.dayOfWeek, !!holidayMap[d2Obj.dateStr], currentWModes, currentDutyMode);
+                          if (v1 && !Utils.isOff(v1) && !validNeeds2.includes(v1)) continue; 
+                          if (v2 && !Utils.isOff(v2) && !validNeedsTypes.includes(v2)) continue; 
+
+                          tr[k1] = v2; tr[k2] = v1;
+                          let newScore = evaluate(tr);
+                          if (newScore < currentScore) { currentScore = newScore; if(newScore<bestScore){bestScore=newScore;bestRoster={...tr};} }
+                          else { tr[k1] = v1; tr[k2] = v2; }
+                      }
+                  }
+              }
+           }
+
+           const elapsed = Date.now() - startTime;
+           const currentProgress = Math.min(100, Math.floor((elapsed / MAX_TIME_MS) * 100));
+           if (currentProgress > lastProgress + 2) {
+               setSimulationProgress(currentProgress);
+               lastProgress = currentProgress;
+           }
+
+           if (iterations < MAX_ITERATIONS && elapsed < MAX_TIME_MS && currentScore > 0) {
+             requestAnimationFrame(optimizeBatch);
+           } else { setRosterData(bestRoster); setSimulationStatus(""); setSimulationProgress(0); }
+        };
+        requestAnimationFrame(optimizeBatch);
+      };
+
+      // 🔥 【完璧な休み帳尻合わせ】
+      const executeHolidayAdjust = () => {
+        if (!staffList.length) return;
+        setSimulationStatus("休みの文字を整頓中...");
+        let tr = { ...rosterData };
+        const locked = { ...lockedCells }; 
+        
+        staffList.forEach(s => {
+            if (s.isAllOff) return; // 全休者は何もしない
+
+            let totalOffsCount = 0;  
+            let totalRestsCount = 0; 
+            const unlockOffs = [];   
+            const unlockRests = [];  
+            
+            datesList.forEach((d) => {
+                const k = Utils.getKey(d.dateStr, s.id);
+                const v = tr[k];
+                
+                if (v === 'off') {
+                    totalOffsCount++;
+                    if (!locked[k]) unlockOffs.push({k, d}); 
+                }
+                else if (v === 'rest') {
+                    totalRestsCount++;
+                    if (!locked[k]) unlockRests.push({k, d}); 
+                }
+            });
+            
+            const total = totalOffsCount + totalRestsCount;
+            if (total === 0) return; 
+            
+            const targetOff = Math.ceil(total / 2);
+            let diff = targetOff - totalOffsCount; 
+            
+            if (diff > 0) {
+                unlockRests.sort((a, b) => {
+                    if (a.d.dayOfWeek === 0 && b.d.dayOfWeek !== 0) return -1;
+                    if (a.d.dayOfWeek !== 0 && b.d.dayOfWeek === 0) return 1;
+                    return 0;
+                });
+                for (let i = 0; i < diff; i++) {
+                    if (unlockRests[i]) tr[unlockRests[i].k] = 'off';
+                }
+            } else if (diff < 0) {
+                let over = Math.abs(diff);
+                unlockOffs.sort((a, b) => {
+                    if (a.d.dayOfWeek !== 0 && b.d.dayOfWeek === 0) return -1;
+                    if (a.d.dayOfWeek === 0 && b.d.dayOfWeek !== 0) return 1;
+                    return 0;
+                });
+                for (let i = 0; i < over; i++) {
+                    if (unlockOffs[i]) tr[unlockOffs[i].k] = 'rest';
+                }
+            }
+        });
+        
+        setRosterData(tr);
+        setSimulationStatus("");
+        showAlert("手動の休みも含めて計算し、自動配置された文字だけを整頓してぴったり半分に揃えました！", "文字の整頓完了");
+      };
+
+      const handleCellClick = (dateStr, staffId) => {
+        if (!penMode) return;
+        const k = Utils.getKey(dateStr, staffId);
+        setRosterData(p => { const n = {...p}; if(penMode.type==='clear') delete n[k]; else n[k]=penMode.val; return n; });
+        setLockedCells(p => { const n = {...p}; if(penMode.type==='clear') delete n[k]; else n[k]=true; return n; });
+      };
+
+      const handleExport = (type) => {
+        const data = type === 'all' ? { stfs: staffList, duties, cdm: currentDutyMode, iw: isWinterMode, wmn: weekdayModesNormal, wmw: weekdayModesWinter, r: rosterData, l: lockedCells, h: holidayMap, dmo: dailyModeOverrides, aiSimTime, tamaSimTime: tamatsukiSimTime } : { stfs: staffList };
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `roster_${type}_${new Date().toISOString().slice(0,10)}.json`;
+        a.click(); URL.revokeObjectURL(a.href); showAlert("保存しました");
+      };
+
+      const handleImport = (e, type) => {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const p = JSON.parse(event.target.result);
+            showConfirm("データを復元しますか？", () => {
+              if (p.stfs) setStaffList(p.stfs);
+              if (type === 'all') {
+                if (p.cdm) setCurrentDutyMode(p.cdm); if (p.iw !== undefined) setIsWinterMode(p.iw);
+                if (p.wmn) setWeekdayModesNormal(p.wmn); if (p.wmw) setWeekdayModesWinter(p.wmw);
+                if (p.r) setRosterData(p.r); if (p.l) setLockedCells(p.l); if (p.h) setHolidayMap(p.h); if (p.dmo) setDailyModeOverrides(p.dmo);
+                if (p.aiSimTime) setAiSimTime(p.aiSimTime); if (p.tamaSimTime) setTamatsukiSimTime(p.tamaSimTime);
+              }
+              setActiveModal(null);
+            });
+          } catch (err) { showAlert('ファイル形式エラー', "エラー"); }
+        };
+        reader.readAsText(file); e.target.value = "";
+      };
+
+      const handleShare = async () => {
+        if (!staffList.length) return;
+        const sId = mobileSelectedStaffId || staffList[0]?.id;
+        const staff = staffList.find(s => s.id === sId);
+        if (!staff) return;
+
+        let text = `【${staff.name}】シフト\n(${startDateStr}〜)\n\n`;
+        datesList.forEach(d => {
+          const v = rosterData[Utils.getKey(d.dateStr, sId)];
+          const dutyName = v ? Utils.getDutyName(v, duties) : '未定';
+          text += `${d.dateStr.slice(5)} (${d.dayLabel}) : ${dutyName}\n`;
+        });
+
+        if (navigator.share) {
+          try { await navigator.share({ title: `${staff.name}のシフト`, text: text }); } catch (err) { }
+        } else {
+          navigator.clipboard.writeText(text);
+          showAlert("お使いの環境は共有機能に非対応のため、シフトをクリップボードにコピーしました。", "コピー完了");
+        }
+      };
+
+      const getMissingDuties = (dateStr, isHol, dayOfWeek) => {
+        const currentWModes = isWinterMode ? weekdayModesWinter : weekdayModesNormal;
+        const mode = dailyModeOverrides[dateStr] || ( (!isHol && dayOfWeek >= 1 && dayOfWeek <= 5) ? currentWModes[dayOfWeek] : null ) || currentDutyMode;
+        let nd = [];
+        if (isHol || dayOfWeek === 0) nd = ['day_express_h', 'day_express_h', 'night'];
+        else if (dayOfWeek === 6) nd = ['day_express_h', 'day_express_h', 'middle', 'night'];
+        else { nd = [...duties.filter(x=>x.type===mode).map(x=>x.id), 'day_express_w', 'night', 'mc']; if(currentWModes.matagi) nd.push('matagi'); }
+        
+        // 全休者を除外してカウント
+        let as = staffList.filter(s=>!s.isAllOff).map(s => rosterData[Utils.getKey(dateStr, s.id)]).filter(v => !!v && !Utils.isOff(v));
+        let asc = [...as]; const ms = [];
+        nd.forEach(ni => { const idx = asc.findIndex(ai => ai === ni); if (idx !== -1) asc.splice(idx, 1); else ms.push(ni); });
+        return ms;
+      };
+
+      const getDuplicateDuties = (dateStr, isHol, dayOfWeek) => {
+        const currentWModes = isWinterMode ? weekdayModesWinter : weekdayModesNormal;
+        const mode = dailyModeOverrides[dateStr] || ( (!isHol && dayOfWeek >= 1 && dayOfWeek <= 5) ? currentWModes[dayOfWeek] : null ) || currentDutyMode;
+        let nd = [];
+        if (isHol || dayOfWeek === 0) nd = ['day_express_h', 'day_express_h', 'night'];
+        else if (dayOfWeek === 6) nd = ['day_express_h', 'day_express_h', 'middle', 'night'];
+        else { nd = [...duties.filter(x=>x.type===mode).map(x=>x.id), 'day_express_w', 'night', 'mc']; if(currentWModes.matagi) nd.push('matagi'); }
+
+        const c = {}; const de = [];
+        staffList.forEach(s => { 
+            if(s.isAllOff) return;
+            const v = rosterData[Utils.getKey(dateStr, s.id)]; 
+            if (!!v && !Utils.isOff(v)) c[v] = (c[v] || 0) + 1; 
+        });
+        Object.entries(c).forEach(([id, n]) => {
+          if (id === 'day_express_h') { if (n >= 3) de.push(id); } 
+          else if (id === 'night') { const nightNeed = nd.filter(x=>x==='night').length || 1; if (n > nightNeed) de.push(id); } 
+          else { if (n >= 2) de.push(id); }
+        });
+        return de;
+      };
+
+      const getWarningMap = () => {
+        const w = {};
+        staffList.forEach(s => {
+          if(s.isAllOff) return;
+          let cc = 0; let cb = []; 
+          datesList.forEach((d) => {
+            const k = Utils.getKey(d.dateStr, s.id); const v = rosterData[k];
+            if (!!v && !Utils.isOff(v)) { cc++; cb.push(k); } 
+            else { if (cc >= 6) cb.forEach(x => w[x] = true); cc = 0; cb = []; }
+          });
+          if (cc >= 6) cb.forEach(x => w[x] = true);
+        });
+        return w;
+      };
+      const warningMap = useMemo(() => getWarningMap(), [rosterData, datesList, staffList]);
+
+      const handlePointerDown = (id) => {
+        if (longPressTimer.current) clearTimeout(longPressTimer.current);
+        longPressTimer.current = setTimeout(() => setHighlightDuty(id), 400); 
+      };
+      const handlePointerUp = () => {
+        if (longPressTimer.current) clearTimeout(longPressTimer.current);
+        if (highlightDuty) setHighlightDuty(null);
+      };
+
+      return (
+        <div className="flex flex-col h-screen bg-slate-50 text-sm font-sans overflow-hidden print:h-auto print:bg-white print:overflow-visible">
+          
+          {dialog && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 print:hidden" onMouseDown={()=>!dialog.isAlert&&setDialog(null)}>
+              <div className="bg-white rounded-xl p-6 w-full max-w-sm text-center shadow-2xl animate-in zoom-in-95" onMouseDown={e=>e.stopPropagation()}>
+                {dialog.title && <div className="text-lg font-bold mb-3 text-slate-800">{dialog.title}</div>}
+                <div className="whitespace-pre-wrap mb-6 font-bold text-slate-600 text-sm">{dialog.message}</div>
+                <div className="flex justify-center gap-3">
+                  {!dialog.isAlert && <Button onClick={()=>setDialog(null)} className="flex-1 py-2.5">キャンセル</Button>}
+                  <Button onClick={()=>{dialog.onConfirm(); setDialog(null);}} variant={dialog.isDanger?"danger":"primary"} className="flex-1 py-2.5">OK</Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <ConfigModal isOpen={activeModal==='config'} onClose={()=>setActiveModal(null)} data={{staffList,duties,currentDutyMode,isWinterMode,weekdayModesNormal,weekdayModesWinter,aiSimTime,tamatsukiSimTime}} actions={{setStaffList,setCurrentDutyMode,setIsWinterMode,setWeekdayModesNormal,setWeekdayModesWinter,setAiSimTime,setTamatsukiSimTime,handleExport,handleImport,showAlert,showConfirm}} />
+          <DailyListModal isOpen={activeModal==='daily'} onClose={()=>setActiveModal(null)} dateStr={datesList[0].dateStr} staffList={staffList} rosterData={rosterData} duties={duties} />
+          <DaySettingModal isOpen={activeModal==='daySetting'} onClose={()=>setActiveModal(null)} dateStr={daySettingTarget} isHol={!!holidayMap[daySettingTarget]} customMode={dailyModeOverrides[daySettingTarget]} onToggleHol={()=>setHolidayMap(p=>({...p,[daySettingTarget]:!p[daySettingTarget]}))} onSetMode={(m)=>setDailyModeOverrides(p=>{const n={...p};if(m)n[daySettingTarget]=m;else delete n[daySettingTarget];return n;})} />
+
+          <header className="bg-white border-b border-gray-200 flex flex-col shrink-0 shadow-sm print:hidden z-30 relative">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                <button onClick={()=>setStartDateStr(Utils.addDays(startDateStr,-28))} className="p-1.5 hover:bg-white rounded-md text-slate-500"><ChevronsLeft size={16}/></button>
+                <button onClick={()=>setStartDateStr(Utils.addDays(startDateStr,-7))} className="p-1.5 hover:bg-white rounded-md text-slate-500 border-l border-slate-200"><ChevronLeft size={16}/></button>
+                <button onClick={()=>setStartDateStr(Utils.getSundayStart())} className="px-3 text-xs font-bold text-slate-600 hover:text-slate-900">今日</button>
+                <span className="text-sm font-black px-2 text-slate-700">{startDateStr}</span>
+                <button onClick={()=>setStartDateStr(Utils.addDays(startDateStr,7))} className="p-1.5 hover:bg-white rounded-md text-slate-500 border-r border-slate-200"><ChevronRight size={16}/></button>
+                <button onClick={()=>setStartDateStr(Utils.addDays(startDateStr,28))} className="p-1.5 hover:bg-white rounded-md text-slate-500"><ChevronsRight size={16}/></button>
+              </div>
+              <div className="flex gap-1.5">
+                <Button onClick={()=>setActiveModal('daily')} variant="ghost" size="sm" title="朝礼リスト"><ClipboardList size={16}/></Button>
+                <Button onClick={handleShare} variant="ghost" size="sm" title="共有"><Share2 size={16}/></Button>
+                <Button onClick={()=>window.print()} variant="ghost" size="sm" title="印刷"><Printer size={16}/></Button>
+                <Button onClick={()=>setActiveModal('config')} variant="ghost" size="sm" title="設定"><Settings size={16}/></Button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2 bg-slate-50">
+              <div className="flex bg-white rounded-lg p-1 border border-slate-200 shadow-sm">
+                <button onClick={()=>setViewMode('pc')} className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode==='pc'?'bg-slate-100 shadow-sm text-indigo-700':'text-slate-500 hover:bg-slate-50'}`}><Monitor size={14} className="inline mr-1"/>PC</button>
+                <button onClick={()=>setViewMode('mb')} className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode==='mb'?'bg-slate-100 shadow-sm text-indigo-700':'text-slate-500 hover:bg-slate-50'}`}><Smartphone size={14} className="inline mr-1"/>スマホ</button>
+              </div>
+              {viewMode === 'mb' && staffList.length > 0 && (
+                 <select value={mobileSelectedStaffId || staffList[0]?.id || ''} onChange={e=>setMobileSelectedStaffId(e.target.value)} className="bg-indigo-600 text-white font-bold px-3 py-1.5 rounded-lg outline-none max-w-[160px] text-sm shadow-sm border border-indigo-700 appearance-none truncate text-center">
+                   {staffList.map(s=><option key={s.id} value={s.id} className="text-black bg-white">{s.name}{s.isAllOff?' (全休)':''}</option>)}
+                 </select>
+              )}
+            </div>
+          </header>
+
+          <div className="flex-1 overflow-hidden flex flex-col print:hidden">
+            {staffList.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50 text-slate-500">
+                <User size={56} className="mb-4 opacity-20" />
+                <p className="font-bold text-xl mb-6 text-slate-600">スタッフが登録されていません</p>
+                <Button onClick={()=>setActiveModal('config')} variant="primary" size="lg" className="px-8 py-4 text-base shadow-lg"><Settings size={20}/> 設定から追加・読み込み</Button>
+              </div>
+            ) : viewMode === 'mb' ? (
+              <div className="flex-1 overflow-y-auto bg-white pb-24">
+                 <table className="w-full text-left text-sm">
+                   <tbody>
+                     {datesList.map(d => {
+                       const sId = mobileSelectedStaffId || staffList[0]?.id;
+                       const s = staffList.find(x => x.id === sId);
+                       const v = rosterData[Utils.getKey(d.dateStr, sId)];
+                       const isHol = holidayMap[d.dateStr] || d.dayOfWeek===0 || d.dayOfWeek===6;
+                       const isAllOffBg = s?.isAllOff ? 'bg-slate-100/50 opacity-60' : '';
+                       return (
+                         <tr key={d.dateStr} onClick={()=>handleCellClick(d.dateStr, sId)} className={`border-b border-gray-100 active:bg-gray-100 transition-colors ${new Date().toISOString().slice(0,10)===d.dateStr?'bg-indigo-50/50':''} ${isAllOffBg}`}>
+                           <td className={`p-4 w-24 whitespace-nowrap align-middle ${isHol?'text-rose-600':'text-slate-600'}`}><span className="font-black text-base">{d.dateStr.slice(5)}</span><span className="text-xs ml-1 font-bold">({d.dayLabel})</span></td>
+                           <td className="p-4 align-middle font-bold text-base">{v ? <span className={Utils.isOff(v)?'text-rose-500':'text-indigo-700'}>{Utils.getDutyName(v, duties)}</span> : <span className="text-gray-300">-</span>}</td>
+                         </tr>
+                       );
+                     })}
+                   </tbody>
+                 </table>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-auto bg-slate-50 pb-32">
+                <table className="border-collapse min-w-max w-full text-center text-xs">
+                  <thead className="sticky top-0 z-20 bg-white shadow-sm ring-1 ring-black/5">
+                    <tr>
+                      <th className="sticky left-0 z-30 bg-white p-2 border-r border-b border-gray-200 text-left w-[100px] text-slate-500">氏名</th>
+                      {datesList.map(d => {
+                        const isHol = !!holidayMap[d.dateStr]; const cm = dailyModeOverrides[d.dateStr];
+                        const ms = getMissingDuties(d.dateStr, isHol, d.dayOfWeek);
+                        const dups = getDuplicateDuties(d.dateStr, isHol, d.dayOfWeek);
+                        
+                        let headerBg = d.dayOfWeek===0||isHol?'bg-rose-50 text-rose-700':d.dayOfWeek===6?'bg-slate-50 text-blue-700':'bg-white text-slate-700';
+                        if (staffList.length > 0) {
+                            if (ms.length > 0) headerBg = 'bg-red-100 text-red-800 border-red-200 shadow-[inset_0_-2px_0_rgba(239,68,68,0.2)]';
+                            else if (dups.length > 0) headerBg = 'bg-yellow-100 text-yellow-800 border-yellow-200 shadow-[inset_0_-2px_0_rgba(234,179,8,0.2)]';
+                            else headerBg = 'bg-emerald-100 text-emerald-800 border-emerald-200 shadow-[inset_0_-2px_0_rgba(16,185,129,0.2)]';
+                        }
+
+                        return (
+                          <th key={d.dateStr} onClick={()=>{setDaySettingTarget(d.dateStr); setActiveModal('daySetting');}} className={`p-1 border-b border-r cursor-pointer hover:opacity-80 align-middle transition-colors ${headerBg}`}>
+                            <div className="text-[9px] font-normal leading-none opacity-80">{d.dayLabel}</div><div className="font-bold leading-tight">{d.dayNum}</div>
+                            {cm && <div className="text-[8px] bg-indigo-600 text-white rounded-full px-1 mt-0.5 inline-block">{cm.replace('type','')}</div>}
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white">
+                    {staffList.map(s => {
+                      const rInfo = ROLES[s.role] || ROLES.regular;
+                      let w=0, kyu=0, hi=0, nen=0, kei=0; 
+                      datesList.forEach(d=>{
+                        const v=rosterData[Utils.getKey(d.dateStr,s.id)]; 
+                        if(!!v&&!Utils.isOff(v)) w++; 
+                        else if(v==='off') kyu++;
+                        else if(v==='rest') hi++;
+                        else if(v==='leave') nen++;
+                        else if(v==='plan_leave') kei++;
+                      });
+                      return (
+                        <tr key={s.id} className={`h-8 transition-colors ${s.isAllOff ? 'bg-slate-100 opacity-60 hover:bg-slate-200' : 'hover:bg-slate-50'}`}>
+                          <td className={`sticky left-0 z-10 border-r border-b border-gray-200 p-1 text-left shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] w-[100px] ${s.isAllOff ? 'bg-slate-100' : 'bg-white'}`}>
+                            <div className="flex justify-between items-center"><span className="font-bold flex items-center gap-1 text-slate-800">{s.isFixed&&<AlertOctagon size={10} className="text-blue-500"/>}{s.isAllOff&&<BedDouble size={10} className="text-rose-500"/>}{s.name}</span><span className={`text-[9px] px-1 rounded border ${rInfo.color}`}>{rInfo.short}</span></div>
+                            <div className="flex flex-wrap gap-x-1 gap-y-[1px] text-[9px] text-gray-500 mt-0.5 leading-none">
+                              <span>出:<span className={`font-bold ${w>20?'text-rose-500':w===20?'text-emerald-500':''}`}>{w}</span></span>
+                              <span>休:<span className={`font-bold ${kyu!==4?'text-rose-500':''}`}>{kyu}</span></span>
+                              <span>非:<span className={`font-bold ${hi!==4?'text-rose-500':''}`}>{hi}</span></span>
+                              {nen > 0 && <span>年:<span className="font-bold text-slate-700">{nen}</span></span>}
+                              {kei > 0 && <span>計:<span className="font-bold text-slate-700">{kei}</span></span>}
+                            </div>
+                          </td>
+                          {datesList.map(d => {
+                             const k = Utils.getKey(d.dateStr, s.id); const v = rosterData[k]; const isHol = !!holidayMap[d.dateStr];
+                             
+                             const isBlank = !v;
+                             const baseBg = isBlank 
+                               ? 'bg-rose-50/40 ring-1 ring-rose-200 ring-inset' 
+                               : (s.isFixed && (d.dayOfWeek===0||d.dayOfWeek===6||isHol)) 
+                                 ? 'bg-[url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0JyBoZWlnaHQ9JzQnPjxyZWN0IHdpZHRoPSc0JyBoZWlnaHQ9JzQnIGZpbGw9JyNmZmYnLz48cGF0aCBkPSdNMCA0TDRgMlpNMCwwTDRgNFonIHN0cm9rZT0nI2UyZThmMCcgc3Ryb2tlLXdpZHRoPScxJy8+PC9zdmc+")]' 
+                                 : (d.dayOfWeek===0||isHol?'bg-rose-50/50':d.dayOfWeek===6?'bg-slate-50/50':'transparent');
+                             
+                             const dups = getDuplicateDuties(d.dateStr, isHol, d.dayOfWeek); 
+                             const isDup = !!v && !Utils.isOff(v) && dups.includes(v);
+
+                             const isTargetDuty = highlightDuty && v === highlightDuty;
+                             const opacityClass = highlightDuty ? (isTargetDuty ? 'opacity-100 ring-2 ring-indigo-500 z-10 scale-105 relative print-opacity-100' : 'opacity-20 print-opacity-100') : 'print-opacity-100';
+                             
+                             return (
+                               <td key={d.dateStr} onClick={()=>handleCellClick(d.dateStr, s.id)} className={`border-r border-b border-gray-100 relative cursor-pointer min-w-[36px] transition-all duration-200 ${baseBg} ${isDup?'bg-rose-500 text-white':''} ${lockedCells[k]?'ring-inset ring-2 ring-black/10':''} ${opacityClass}`}>
+                                 {v && <div className={`w-full h-full flex items-center justify-center font-bold text-[10px] rounded leading-none py-1 ${isDup?'text-white':(duties.find(x=>x.id===v)?.color||STATUSES.find(x=>x.id===v)?.color)}`}>{Utils.getDutyName(v, duties)}</div>}
+                                 {warningMap[k] && !isDup && <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-rose-500 rounded-bl-full shadow-sm z-20"></div>}
+                                 {lockedCells[k] && <Lock size={6} className="absolute top-0.5 right-0.5 opacity-30"/>}
+                               </td>
+                             );
+                          })}
+                        </tr>
+                      );
+                    })}
+                    {staffList.length > 0 && (
+                      <tr className="bg-rose-50 border-t-2 border-rose-200 shadow-inner">
+                        <td className="sticky left-0 z-10 bg-rose-50 border-r border-gray-200 p-1 text-rose-700 font-bold flex flex-col items-center justify-center h-full"><AlertTriangle size={16} className="mb-0.5"/><span className="text-[9px]">不足</span></td>
+                        {datesList.map(d => {
+                          const ms = getMissingDuties(d.dateStr, !!holidayMap[d.dateStr], d.dayOfWeek);
+                          return (
+                            <td key={d.dateStr} className={`border-r border-gray-100 align-top p-[1px] ${ms.length?'bg-rose-100/50':''}`}>
+                              <div className="flex flex-col gap-[1px] min-h-[20px]">{ms.map((id,i)=><div key={i} className={`text-[9px] font-bold text-center py-0.5 rounded shadow-sm border ${duties.find(x=>x.id===id)?.color||'bg-white'}`}>{Utils.getDutyName(id,duties)}</div>)}</div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ========================================== */}
+          {/* 🖨️ 印刷専用レイアウト */}
+          {/* ========================================== */}
+          <div className="hidden print:block w-full bg-white text-black font-sans">
+            <div className="flex justify-between items-end mb-2">
+              <h2 className="text-lg font-bold tracking-widest">班 シフト表</h2>
+              <div className="text-xs font-bold">
+                自 {startDateStr.replace(/-/g, '/')} 〜 至 {datesList[datesList.length-1].dateStr.replace(/-/g, '/')}
+              </div>
+            </div>
+            
+            <table className="w-full border-collapse text-center" style={{ tableLayout: 'fixed' }}>
+              <thead>
+                <tr>
+                  <th className="border border-black p-0.5 w-[50px] text-[10px] font-normal" rowSpan={2}>区</th>
+                  <th className="border border-black p-0.5 w-[30px] text-[10px] font-normal" rowSpan={2}>別</th>
+                  {datesList.map(d => <th key={d.dateStr} className="border border-black p-0 text-[10px] font-normal">{d.dayNum}</th>)}
+                </tr>
+                <tr>
+                  {datesList.map(d => <th key={d.dateStr} className="border border-black p-0 text-[10px] font-normal">{d.dayLabel}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {staffList.map(s => (
+                  <React.Fragment key={s.id}>
+                    <tr className={s.isAllOff ? "opacity-50" : ""}>
+                      <td className="border border-black px-1 py-0.5 text-[11px] font-bold text-left overflow-hidden whitespace-nowrap" rowSpan={2}>{s.name}</td>
+                      <td className="border border-black p-0 text-[9px]">指定</td>
+                      {datesList.map(d => {
+                        const v = rosterData[Utils.getKey(d.dateStr, s.id)];
+                        let text = ""; let isRed = false;
+                        if (v) {
+                          if (v === 'day_express_w' || v === 'day_express_h') text = "日44";
+                          else text = Utils.getDutyName(v, duties);
+                          isRed = Utils.isOff(v);
+                        }
+                        return (
+                          <td key={`shitei-${d.dateStr}`} className={`border border-black p-0 text-[10px] font-bold ${isRed ? 'text-red-600' : 'text-black'}`}>
+                            {text}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    <tr className={s.isAllOff ? "opacity-50" : ""}>
+                      <td className="border border-black p-0 text-[9px]">変更</td>
+                      {datesList.map(d => <td key={`henko-${d.dateStr}`} className="border border-black p-0"></td>)}
+                    </tr>
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="fixed bottom-24 right-4 z-[60] flex flex-col items-end gap-3 print:hidden">
+            {/* 🔥 プログレスバー風ステータス表示 */}
+            {simulationStatus && (
+              <div className="relative bg-slate-800 text-white text-[10px] font-bold px-4 py-2.5 rounded-full shadow-xl flex items-center justify-center w-40 overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+                <div className="absolute top-0 left-0 h-full bg-indigo-500 transition-all duration-[200ms] ease-out" style={{ width: `${simulationProgress}%` }}></div>
+                <div className="relative z-10 flex items-center gap-2 drop-shadow-md">
+                  <Loader size={14}/>
+                  <span>{simulationStatus}</span>
+                  <span className="w-6 text-right">{simulationProgress}%</span>
+                </div>
+              </div>
+            )}
+            <button onClick={executeHolidayAdjust} disabled={!!simulationStatus||!staffList.length} className="bg-amber-500 text-white rounded-full w-12 h-12 shadow-lg flex flex-col items-center justify-center transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"><Scale size={16}/><span className="text-[7px] font-bold mt-0.5">休み調整</span></button>
+            <button onClick={executeTamatsuki} disabled={!!simulationStatus||!staffList.length} className="bg-teal-600 text-white rounded-full w-12 h-12 shadow-lg flex flex-col items-center justify-center transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"><Sparkles size={16}/><span className="text-[7px] font-bold mt-0.5">仕上げ</span></button>
+            <button onClick={executeAutoAssign} disabled={!!simulationStatus||!staffList.length} className="bg-indigo-600 text-white rounded-full w-16 h-16 shadow-xl flex flex-col items-center justify-center transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"><Wand2 size={24}/><span className="text-[9px] font-bold mt-0.5">AI作成</span></button>
+          </div>
+
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-2 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-[50] flex flex-col gap-2 print:hidden pb-safe">
+            <div className="flex justify-between items-center px-1 overflow-x-auto no-scrollbar gap-2">
+              <div className="flex bg-slate-100 rounded-lg p-1 shrink-0 border border-slate-200">
+                {['status','type7','type6','type5','special'].map(c=><button key={c} onClick={()=>setToolCategory(c)} className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${toolCategory===c?'bg-white text-indigo-700 shadow-sm':'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>{c==='status'?'休・非':c==='special'?'特殊':c.replace('type','')+'人区'}</button>)}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={()=>setPenMode(null)} className={`flex flex-col items-center justify-center w-12 h-10 rounded-lg border transition-all ${!penMode?'bg-slate-800 text-white border-slate-900 shadow-inner':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}><Zap size={16}/><span className="text-[9px] font-bold">選択</span></button>
+                <button onClick={()=>setPenMode({type:'clear'})} className={`flex flex-col items-center justify-center w-12 h-10 rounded-lg border transition-all ${penMode?.type==='clear'?'bg-rose-600 text-white border-rose-700 shadow-inner':'bg-white text-rose-500 border-rose-200 hover:bg-rose-50'}`}><Eraser size={16}/><span className="text-[9px] font-bold">消す</span></button>
+              </div>
+            </div>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 px-1 select-none">
+              {(toolCategory==='status'?STATUSES:duties.filter(d=>d.type===toolCategory)).map(i=>(
+                <button 
+                  key={i.id} 
+                  onPointerDown={()=>handlePointerDown(i.id)} 
+                  onPointerUp={handlePointerUp} 
+                  onPointerLeave={handlePointerUp}
+                  onPointerCancel={handlePointerUp}
+                  onContextMenu={(e)=>e.preventDefault()}
+                  onClick={()=>setPenMode({type:'stamp',val:i.id})} 
+                  className={`flex-shrink-0 px-4 py-2.5 rounded-lg border text-xs font-bold shadow-sm transition-all active:scale-95 ${penMode?.val===i.id?'ring-2 ring-indigo-500 ring-offset-1 transform scale-105 z-10':''} ${i.color}`}
+                >
+                  {i.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 🛡️ エラー時の真っ白防止用セーフティネット
+    // ==========================================
+    class ErrorBoundary extends React.Component {
+      constructor(props) { super(props); this.state = { hasError: false, errorInfo: null }; }
+      static getDerivedStateFromError(error) { return { hasError: true, errorInfo: error }; }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
+              <h2 style={{ color: '#e11d48' }}>申し訳ありません、エラーが発生しました。</h2>
+              <p>アプリの起動中に問題が起きました。以下のエラー内容をコピーして開発者にお伝えください。</p>
+              <pre style={{ background: '#f1f5f9', padding: '10px', borderRadius: '5px', overflowX: 'auto', fontSize: '12px' }}>
+                {this.state.errorInfo && this.state.errorInfo.toString()}
+              </pre>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<ErrorBoundary><App /></ErrorBoundary>);
+  </script>
+</body>
+</html>
