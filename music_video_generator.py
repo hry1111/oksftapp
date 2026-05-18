@@ -168,23 +168,87 @@ def draw_neon_title(
 
 
 # ---------------------------------------------------------------------------
-# 描画: ラベル (AI generated / アーティスト名)
+# 描画: ラベル (AI generated / ミニイコライザー / アーティスト名)
 # ---------------------------------------------------------------------------
-def draw_labels(canvas: Image.Image, artist: str, w: int, h: int) -> None:
-    """左上に「AI generated」とアーティスト名を描画する。"""
-    draw = ImageDraw.Draw(canvas)
+FADE_IN_SEC = 1.5   # フェードイン秒数
+EQ_BARS = 8         # ミニイコライザーのバー数
+EQ_BAR_W = 3
+EQ_BAR_GAP = 2
+EQ_MAX_H = 14       # バー最大高さ (px)
+
+
+def draw_labels(
+    canvas: Image.Image,
+    artist: str,
+    w: int,
+    h: int,
+    frame_idx: int = -1,
+    frame_data: np.ndarray | None = None,
+    fps: int = FPS,
+) -> None:
+    """
+    左上に「AI generated」→ ミニイコライザー → アーティスト名を描画する。
+
+    frame_idx >= 0 の場合:
+      - 最初の FADE_IN_SEC 秒でアルファがフェードイン
+      - frame_data があればミニイコライザーを音楽に連動させる
+    """
+    # フェードイン alpha 計算
+    if frame_idx < 0:
+        fade = 1.0
+    else:
+        fade = min(1.0, frame_idx / max(1, int(fps * FADE_IN_SEC)))
+
+    if fade <= 0:
+        return
+
+    ov = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(ov)
+
     f_ai = get_font(FONT_SIZE_AI)
     f_artist = get_font(FONT_SIZE_ARTIST)
     x, y = TEXT_PADDING, TEXT_PADDING
 
-    def shadow_text(d, xy, txt, font, fill=(255, 255, 255, 240), shadow=(0, 0, 0, 160)):
-        d.text((xy[0] + 2, xy[1] + 2), txt, font=font, fill=shadow)
-        d.text(xy, txt, font=font, fill=fill)
+    def st(xy, txt, font, base_fill=(255, 255, 255), base_alpha=230, shadow_alpha=150):
+        fa = int(base_alpha * fade)
+        sa = int(shadow_alpha * fade)
+        d.text((xy[0] + 2, xy[1] + 2), txt, font=font, fill=(*[0, 0, 0], sa))
+        d.text(xy, txt, font=font, fill=(*base_fill, fa))
 
-    shadow_text(draw, (x, y), AI_LABEL, f_ai, fill=(210, 210, 210, 230))
-    bb = draw.textbbox((x, y), AI_LABEL, font=f_ai)
-    y2 = y + (bb[3] - bb[1]) + 6
-    shadow_text(draw, (x, y2), artist, f_artist)
+    # ── "AI generated"
+    st((x, y), AI_LABEL, f_ai, base_fill=(210, 210, 210))
+    bb_ai = d.textbbox((x, y), AI_LABEL, font=f_ai)
+    ai_h = bb_ai[3] - bb_ai[1]
+
+    # ── ミニイコライザー (2行の間)
+    eq_top = y + ai_h + 5
+    eq_bottom = eq_top + EQ_MAX_H
+
+    if frame_data is not None:
+        n_freq = len(frame_data)
+        # 低〜中周波数帯域 (最初の1/3) から取得
+        upper = max(EQ_BARS, n_freq // 3)
+        indices = np.linspace(0, upper - 1, EQ_BARS).astype(int)
+        amps = frame_data[indices]
+        # 少しランダム感のためにフレームに応じた位相シフトを加える
+        phase = (frame_idx * 0.15) if frame_idx >= 0 else 0
+        amps = np.clip(amps + 0.1 * np.sin(np.arange(EQ_BARS) + phase), 0, 1)
+    else:
+        amps = np.ones(EQ_BARS) * 0.5
+
+    for i, amp in enumerate(amps):
+        bh = max(2, int(amp * EQ_MAX_H))
+        bx0 = x + i * (EQ_BAR_W + EQ_BAR_GAP)
+        bx1 = bx0 + EQ_BAR_W
+        by0 = eq_bottom - bh
+        bar_alpha = int(190 * fade)
+        d.rectangle([bx0, by0, bx1, eq_bottom], fill=(180, 180, 180, bar_alpha))
+
+    # ── アーティスト名
+    artist_y = eq_bottom + 5
+    st((x, artist_y), artist, f_artist)
+
+    canvas.alpha_composite(ov)
 
 
 # ---------------------------------------------------------------------------
@@ -281,11 +345,10 @@ def build_base_vertical(
     song_title: str, artist: str,
     style: dict | None = None,
 ) -> Image.Image:
-    """縦動画 (TikTok / Shorts) 用ベースキャンバス。静的要素を事前描画済み。"""
+    """縦動画 (TikTok / Shorts) 用ベースキャンバス。静的要素（ジャケット・グラデ・タイトル）を事前描画済み。"""
     base = load_cover(jacket_path, w, h)
     add_bottom_gradient(base, w, h, ratio=0.42, max_alpha=215)
     draw_neon_title(base, song_title, w, h, style)
-    draw_labels(base, artist, w, h)
     return base
 
 
@@ -320,7 +383,6 @@ def build_base_youtube(
 
     add_bottom_gradient(bg, w, h, ratio=0.35, max_alpha=185)
     draw_neon_title(bg, song_title, w, h, style)
-    draw_labels(bg, artist, w, h)
     return bg
 
 
@@ -382,6 +444,9 @@ def generate_video(
             frame = base.copy()
             draw_vinyl(frame, i, width, height)
             draw_waveform(frame, frame_data, wf_x, wf_top, wf_w, wf_h, s)
+            # ラベル: フェードイン + ミニイコライザーアニメーション
+            draw_labels(frame, artist_name, width, height,
+                        frame_idx=i, frame_data=frame_data, fps=fps)
             proc.stdin.write(frame.tobytes())
 
             if progress_callback and i % fps == 0:
