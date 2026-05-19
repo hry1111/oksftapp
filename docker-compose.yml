@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # 生成した動画ファイルをホストに保持
+      - ./jobs:/app/jobs
+    restart: unless-stopped
+    environment:
+      # 必要に応じて環境変数を追加
+      - PYTHONUNBUFFERED=1
