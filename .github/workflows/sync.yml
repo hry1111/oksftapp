@@ -1,0 +1,25 @@
+name: Sync to music-video-generator
+
+# claude/music-video-generator-VPdFO に push されるたびに
+# hry1111/music-video-generator の main へ自動同期する
+
+on:
+  push:
+    branches:
+      - claude/music-video-generator-VPdFO
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to music-video-generator
+        run: |
+          git remote add target \
+            https://x-access-token:${{ secrets.SYNC_TOKEN }}@github.com/hry1111/music-video-generator.git
+          git push target HEAD:main --force
