@@ -18,11 +18,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Push to music-video-generator
-        env:
-          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }}
+      - name: Setup SSH
         run: |
-          echo "Token length: ${#SYNC_TOKEN}"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Push to music-video-generator
+        run: |
           git remote add target \
-            https://x-access-token:${SYNC_TOKEN}@github.com/hry1111/music-video-generator.git
+            git@github.com:hry1111/music-video-generator.git
           git push target HEAD:main --force
