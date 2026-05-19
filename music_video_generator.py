@@ -8,6 +8,7 @@ CLI と Streamlit Web アプリの両方から利用可能。
 import math
 import os
 import subprocess
+import threading
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -439,23 +440,46 @@ def generate_video(
         output_path,
     ]
 
-    with subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
-        for i, frame_data in enumerate(frames_data):
-            frame = base.copy()
-            draw_vinyl(frame, i, width, height)
-            draw_waveform(frame, frame_data, wf_x, wf_top, wf_w, wf_h, s)
-            # ラベル: フェードイン + ミニイコライザーアニメーション
-            draw_labels(frame, artist_name, width, height,
-                        frame_idx=i, frame_data=frame_data, fps=fps)
-            proc.stdin.write(frame.tobytes())
+    # stderr をバックグラウンドスレッドで収集（バッファ詰まり防止）
+    stderr_lines: list[str] = []
 
-            if progress_callback and i % fps == 0:
-                progress_callback(int(i / n_frames * 100))
+    def _read_stderr(pipe: subprocess.IO) -> None:
+        for line in iter(pipe.readline, b""):
+            stderr_lines.append(line.decode("utf-8", errors="replace").rstrip())
 
-        proc.stdin.close()
+    with subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
+        t = threading.Thread(target=_read_stderr, args=(proc.stderr,), daemon=True)
+        t.start()
+
+        try:
+            for i, frame_data in enumerate(frames_data):
+                frame = base.copy()
+                draw_vinyl(frame, i, width, height)
+                draw_waveform(frame, frame_data, wf_x, wf_top, wf_w, wf_h, s)
+                draw_labels(frame, artist_name, width, height,
+                            frame_idx=i, frame_data=frame_data, fps=fps)
+                proc.stdin.write(frame.tobytes())
+
+                if progress_callback and i % fps == 0:
+                    progress_callback(int(i / n_frames * 100))
+
+        except BrokenPipeError:
+            # ffmpeg が途中で終了 → ループを抜けて returncode を確認
+            pass
+        finally:
+            try:
+                proc.stdin.close()
+            except OSError:
+                pass
+
         proc.wait()
+        t.join(timeout=3)
+
         if proc.returncode != 0:
-            raise RuntimeError(f"ffmpeg failed → {output_path}")
+            err_detail = "\n".join(stderr_lines[-20:])
+            raise RuntimeError(
+                f"ffmpeg failed (exit {proc.returncode}) → {output_path}\n{err_detail}"
+            )
 
     if progress_callback:
         progress_callback(100)

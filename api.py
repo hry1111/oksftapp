@@ -141,9 +141,12 @@ async def api_generate(
     job_dir = JOBS_DIR / job_id
     job_dir.mkdir()
 
-    # アップロードファイルを保存
-    audio_path = str(job_dir / audio.filename)
-    jacket_path = str(job_dir / jacket.filename)
+    # アップロードファイルを拡張子だけ保持した安全な名前で保存
+    # （日本語・特殊文字を含むファイル名でも ffmpeg が確実に読める）
+    audio_ext = Path(audio.filename).suffix.lower() if audio.filename else ".mp3"
+    jacket_ext = Path(jacket.filename).suffix.lower() if jacket.filename else ".jpg"
+    audio_path = str(job_dir / f"audio{audio_ext}")
+    jacket_path = str(job_dir / f"jacket{jacket_ext}")
     with open(audio_path, "wb") as f:
         f.write(await audio.read())
     with open(jacket_path, "wb") as f:
