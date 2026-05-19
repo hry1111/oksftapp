@@ -19,7 +19,10 @@ jobs:
           fetch-depth: 0
 
       - name: Push to music-video-generator
+        env:
+          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }}
         run: |
+          echo "Token length: ${#SYNC_TOKEN}"
           git remote add target \
-            https://x-access-token:${{ secrets.SYNC_TOKEN }}@github.com/hry1111/music-video-generator.git
+            https://x-access-token:${SYNC_TOKEN}@github.com/hry1111/music-video-generator.git
           git push target HEAD:main --force
