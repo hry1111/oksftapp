@@ -443,7 +443,7 @@ def generate_video(
     # stderr をバックグラウンドスレッドで収集（バッファ詰まり防止）
     stderr_lines: list[str] = []
 
-    def _read_stderr(pipe: subprocess.IO) -> None:
+    def _read_stderr(pipe) -> None:
         for line in iter(pipe.readline, b""):
             stderr_lines.append(line.decode("utf-8", errors="replace").rstrip())
 
