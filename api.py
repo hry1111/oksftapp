@@ -63,9 +63,9 @@ WAVE_COLOR_MAP = {
 WAVE_HEIGHT_MAP = {"low": 0.08, "medium": 0.12, "high": 0.18}
 
 FORMAT_CONFIG = {
-    "tiktok":  ("TikTok (9:16)",    1080, 1920, "vertical"),
-    "youtube": ("YouTube横 (16:9)", 1920, 1080, "youtube"),
-    "shorts":  ("Shorts (9:16)",    1080, 1920, "vertical"),
+    "tiktok":  ("TikTok (9:16)",    720, 1280, "vertical"),
+    "youtube": ("YouTube横 (16:9)", 1280, 720, "youtube"),
+    "shorts":  ("Shorts (9:16)",    720, 1280, "vertical"),
 }
 
 # ---------------------------------------------------------------------------
