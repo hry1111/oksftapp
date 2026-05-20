@@ -45,7 +45,7 @@ DEFAULT_STYLE = {
 # ---------------------------------------------------------------------------
 # フォント
 # ---------------------------------------------------------------------------
-def get_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+def get_font(size: int):
     candidates = [
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
