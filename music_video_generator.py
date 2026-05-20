@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Music Video Generator - Core Library
+Music Video Generator - Core Library v2
 音楽ファイルとジャケット画像から動画を生成するコアモジュール。
 CLI と Streamlit Web アプリの両方から利用可能。
 """
