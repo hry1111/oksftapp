@@ -21,7 +21,7 @@ export async function fetchItem(itemCode, { applicationId, affiliateId }) {
   if (!item) return null;
 
   return {
-    itemCode,
+    key: `rakuten:${itemCode}`,
     name: item.itemName,
     price: item.itemPrice,
     url: item.affiliateUrl || item.itemUrl,

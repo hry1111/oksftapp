@@ -12,6 +12,7 @@
     "dry-run": "DRY_RUN=true node src/index.js"
   },
   "dependencies": {
+    "aws4": "^1.13.2",
     "twitter-api-v2": "^1.17.2"
   }
 }

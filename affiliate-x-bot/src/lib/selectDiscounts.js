@@ -3,7 +3,7 @@
  * クールダウン期間を過ぎている商品だけを投稿候補として判定する。
  */
 export function evaluateItem({ item, watchItem, history, postLog, now, defaultThreshold, defaultCooldownDays }) {
-  const prev = history[item.itemCode];
+  const prev = history[item.key];
   const threshold = watchItem.minDiscountRate ?? defaultThreshold;
   const cooldownDays = watchItem.cooldownDays ?? defaultCooldownDays;
 
@@ -20,7 +20,7 @@ export function evaluateItem({ item, watchItem, history, postLog, now, defaultTh
     return { item, watchItem, eligible: false, reason: 'below-threshold', discountRate };
   }
 
-  const lastPostedAt = postLog[item.itemCode];
+  const lastPostedAt = postLog[item.key];
   if (lastPostedAt) {
     const daysSincePost = (now - new Date(lastPostedAt).getTime()) / 86400000;
     if (daysSincePost < cooldownDays) {
