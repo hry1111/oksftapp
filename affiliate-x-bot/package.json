@@ -1,0 +1,17 @@
+{
+  "name": "affiliate-x-bot",
+  "private": true,
+  "version": "1.0.0",
+  "description": "値下げしたオススメ商品のアフィリエイトリンクをXに自動投稿するシステム",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dry-run": "DRY_RUN=true node src/index.js"
+  },
+  "dependencies": {
+    "twitter-api-v2": "^1.17.2"
+  }
+}

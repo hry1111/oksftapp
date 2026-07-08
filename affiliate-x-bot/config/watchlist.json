@@ -1,0 +1,10 @@
+[
+  {
+    "id": "sample-item",
+    "label": "サンプル商品（監視リストの書き方サンプル）",
+    "itemCode": "shopcode:10000001",
+    "enabled": false,
+    "minDiscountRate": 0.15,
+    "cooldownDays": 7
+  }
+]
