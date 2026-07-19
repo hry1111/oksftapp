@@ -1,0 +1,41 @@
+name: Sync to music-video-generator
+
+# claude/music-video-generator-VPdFO に push されるたびに
+# hry1111/music-video-generator の main へ自動同期する
+
+on:
+  push:
+    branches:
+      - claude/music-video-generator-VPdFO
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Push to music-video-generator
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+
+          git remote add target \
+            git@github.com:hry1111/music-video-generator.git
+
+          git push target HEAD:main --force
+
+          echo "${{ github.sha }} $(date -u)" > .deploy_trigger
+          git add .deploy_trigger
+          git commit -m "chore: deploy trigger"
+          git push target HEAD:main

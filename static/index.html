@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#080810">
+<title>Music Video Generator | 七。のAI創作屋</title>
+<style>
+:root {
+  --bg:       #080810;
+  --surface:  #10101c;
+  --surface2: #181828;
+  --border:   #252538;
+  --accent:   #e040fb;
+  --accent2:  #7c4dff;
+  --text:     #e4e4f0;
+  --dim:      #7070a0;
+  --ok:       #4caf50;
+  --err:      #f44336;
+  --r:        14px;
+  --rS:       8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  padding-bottom: 60px;
+}
+
+/* ── ヘッダー ───────────────────────────────────────────── */
+header {
+  background: linear-gradient(160deg, #12001e 0%, #0a0a18 60%);
+  padding: 28px 20px 22px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(12px);
+}
+
+header h1 {
+  font-size: clamp(1.2rem, 5vw, 1.6rem);
+  font-weight: 800;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+header p {
+  color: var(--dim);
+  font-size: 0.78rem;
+  margin-top: 4px;
+}
+
+/* ── レイアウト ─────────────────────────────────────────── */
+main {
+  max-width: 580px;
+  margin: 0 auto;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── カード ─────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 16px;
+}
+
+.card-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-title::before {
+  content: '';
+  display: block;
+  width: 3px;
+  height: 12px;
+  background: linear-gradient(var(--accent), var(--accent2));
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── ドロップゾーン ─────────────────────────────────────── */
+.drop-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--rS);
+  padding: 18px 10px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 108px;
+  transition: border-color 0.2s, background 0.2s;
+  user-select: none;
+}
+
+.drop-zone input[type=file] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.drop-zone:hover, .drop-zone.over { border-color: var(--accent); background: rgba(224,64,251,.05); }
+.drop-zone.filled { border-style: solid; border-color: var(--accent); }
+
+.dz-icon { font-size: 1.6rem; }
+.dz-label { font-size: 0.72rem; color: var(--dim); line-height: 1.4; }
+.dz-name { font-size: 0.68rem; color: var(--accent); word-break: break-all; margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#jacketPreview {
+  width: 100%;
+  border-radius: var(--rS);
+  margin-top: 12px;
+  display: none;
+  object-fit: cover;
+  max-height: 240px;
+}
+
+/* ── テキスト入力 ───────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field + .field { margin-top: 12px; }
+
+.field label {
+  font-size: 0.78rem;
+  color: var(--dim);
+  font-weight: 500;
+}
+
+.field input[type=text] {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--rS);
+  padding: 11px 12px;
+  color: var(--text);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.field input[type=text]:focus { border-color: var(--accent); }
+
+/* ── セレクト ───────────────────────────────────────────── */
+.select-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.select-group { display: flex; flex-direction: column; gap: 5px; }
+
+.select-group label { font-size: 0.75rem; color: var(--dim); font-weight: 500; }
+
+select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--rS);
+  padding: 10px 10px;
+  color: var(--text);
+  font-size: 0.85rem;
+  outline: none;
+  width: 100%;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237070a0' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+/* ── フォーマット チップ ────────────────────────────────── */
+.format-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+.fmt-chip {
+  border: 2px solid var(--border);
+  border-radius: var(--rS);
+  padding: 12px 6px 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.fmt-chip input { display: none; }
+.fmt-chip.on { border-color: var(--accent); background: rgba(224,64,251,.08); }
+.fmt-chip .fi { font-size: 1.4rem; }
+.fmt-chip .fn { font-size: 0.72rem; font-weight: 700; margin-top: 1px; }
+.fmt-chip .fs { font-size: 0.62rem; color: var(--dim); }
+
+/* ── ボタン ─────────────────────────────────────────────── */
+#genBtn {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  border: none;
+  border-radius: var(--r);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+  box-shadow: 0 4px 24px rgba(224,64,251,.25);
+}
+
+#genBtn:active { transform: scale(0.98); }
+#genBtn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+/* ── エラー ─────────────────────────────────────────────── */
+.err-box {
+  background: rgba(244,67,54,.1);
+  border: 1px solid rgba(244,67,54,.3);
+  color: var(--err);
+  border-radius: var(--rS);
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  display: none;
+}
+
+/* ── プログレス ─────────────────────────────────────────── */
+#progressCard { display: none; }
+
+.prog-track {
+  background: var(--surface2);
+  border-radius: 99px;
+  height: 5px;
+  overflow: hidden;
+  margin: 10px 0 8px;
+}
+
+.prog-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 99px;
+  transition: width 0.6s ease;
+  width: 0%;
+}
+
+.prog-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--dim);
+}
+
+.prog-sub { font-size: 0.72rem; color: var(--dim); margin-top: 4px; }
+
+/* ── 生成中アニメ ────────────────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.pulsing { animation: pulse 1.6s ease-in-out infinite; }
+
+/* ── ダウンロード ────────────────────────────────────────── */
+#downloadCard { display: none; }
+
+.done-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(76,175,80,.12);
+  border: 1px solid rgba(76,175,80,.28);
+  color: var(--ok);
+  border-radius: 99px;
+  padding: 5px 13px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.dl-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--rS);
+  padding: 14px 14px;
+  color: var(--text);
+  text-decoration: none;
+  margin-bottom: 10px;
+  transition: border-color 0.18s, background 0.18s;
+  cursor: pointer;
+}
+
+.dl-btn:hover { border-color: var(--accent); background: rgba(224,64,251,.05); }
+.dl-btn:active { transform: scale(0.99); }
+
+.dl-icon { font-size: 1.5rem; flex-shrink: 0; }
+.dl-info { flex: 1; }
+.dl-title { font-size: 0.88rem; font-weight: 600; }
+.dl-size  { font-size: 0.72rem; color: var(--dim); }
+.dl-arr   { color: var(--accent); font-size: 1.1rem; flex-shrink: 0; }
+
+.reset-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--rS);
+  padding: 12px;
+  color: var(--dim);
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: border-color 0.18s, color 0.18s;
+}
+
+.reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎵 Music Video Generator</h1>
+  <p>七。のAI創作屋 — 音楽 × ジャケット → 動画を自動生成</p>
+</header>
+
+<main>
+
+  <!-- ① ファイル -->
+  <div class="card">
+    <div class="card-title">① ファイルをアップロード</div>
+    <div class="drop-row">
+      <div class="drop-zone" id="audioZone">
+        <input type="file" id="audioFile" accept=".mp3,.wav">
+        <span class="dz-icon">🎵</span>
+        <span class="dz-label">音楽ファイル<br>MP3 / WAV</span>
+        <span class="dz-name" id="audioName"></span>
+      </div>
+      <div class="drop-zone" id="jacketZone">
+        <input type="file" id="jacketFile" accept=".jpg,.jpeg,.png">
+        <span class="dz-icon">🖼</span>
+        <span class="dz-label">ジャケット画像<br>JPG / PNG</span>
+        <span class="dz-name" id="jacketName"></span>
+      </div>
+    </div>
+    <img id="jacketPreview" alt="ジャケットプレビュー">
+  </div>
+
+  <!-- ② テキスト -->
+  <div class="card">
+    <div class="card-title">② テキスト設定</div>
+    <div class="field">
+      <label>曲タイトル（ネオングロー表示・空欄で非表示）</label>
+      <input type="text" id="titleInput" placeholder="例: 君にトリップ">
+    </div>
+    <div class="field">
+      <label>アーティスト名（左上に表示）</label>
+      <input type="text" id="artistInput" value="七。のAI創作屋">
+    </div>
+  </div>
+
+  <!-- ③ タイトルスタイル -->
+  <div class="card">
+    <div class="card-title">③ タイトルスタイル</div>
+    <div class="select-grid">
+      <div class="select-group">
+        <label>グローカラー</label>
+        <select id="glowColor">
+          <option value="pink">ピンク / マゼンタ</option>
+          <option value="cyan">シアン / ブルー</option>
+          <option value="gold">ゴールド / オレンジ</option>
+          <option value="green">グリーン / ライム</option>
+          <option value="white">ホワイト（グローなし）</option>
+        </select>
+      </div>
+      <div class="select-group">
+        <label>グロー強度</label>
+        <select id="glowIntensity">
+          <option value="none">なし</option>
+          <option value="low">弱</option>
+          <option value="medium" selected>中</option>
+          <option value="high">強</option>
+        </select>
+      </div>
+      <div class="select-group">
+        <label>タイトル位置</label>
+        <select id="titlePos">
+          <option value="upper" selected>上（画面の27%）</option>
+          <option value="center_upper">中央上（38%）</option>
+          <option value="center">中央（48%）</option>
+        </select>
+      </div>
+      <div class="select-group">
+        <label>フォントサイズ</label>
+        <select id="fontSize">
+          <option value="xs">極小</option>
+          <option value="s">小</option>
+          <option value="m" selected>中</option>
+          <option value="l">大</option>
+          <option value="xl">極大</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ 波形 -->
+  <div class="card">
+    <div class="card-title">④ 波形スタイル</div>
+    <div class="select-grid">
+      <div class="select-group">
+        <label>波形カラー</label>
+        <select id="waveColor">
+          <option value="white">ホワイト</option>
+          <option value="pink">ピンク</option>
+          <option value="cyan">シアン</option>
+          <option value="gold">ゴールド</option>
+        </select>
+      </div>
+      <div class="select-group">
+        <label>波形の高さ</label>
+        <select id="waveHeight">
+          <option value="low">低</option>
+          <option value="medium" selected>中</option>
+          <option value="high">高</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ フォーマット -->
+  <div class="card">
+    <div class="card-title">⑤ 出力フォーマット（複数選択可）</div>
+    <div class="format-row">
+      <label class="fmt-chip on" data-fmt="tiktok">
+        <input type="checkbox" value="tiktok" checked>
+        <span class="fi">📱</span>
+        <span class="fn">TikTok</span>
+        <span class="fs">9:16</span>
+      </label>
+      <label class="fmt-chip on" data-fmt="youtube">
+        <input type="checkbox" value="youtube" checked>
+        <span class="fi">🖥</span>
+        <span class="fn">YouTube</span>
+        <span class="fs">16:9</span>
+      </label>
+      <label class="fmt-chip on" data-fmt="shorts">
+        <input type="checkbox" value="shorts" checked>
+        <span class="fi">⚡</span>
+        <span class="fn">Shorts</span>
+        <span class="fs">9:16</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- 生成ボタン -->
+  <button id="genBtn">▶ 動画を生成する</button>
+  <div class="err-box" id="errBox"></div>
+
+  <!-- プログレス -->
+  <div class="card" id="progressCard">
+    <div class="card-title pulsing" id="progTitle">生成中...</div>
+    <div class="prog-meta">
+      <span id="progTask">開始中...</span>
+      <span id="progPct">0%</span>
+    </div>
+    <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+    <div class="prog-sub" id="progSub"></div>
+  </div>
+
+  <!-- ダウンロード -->
+  <div class="card" id="downloadCard">
+    <div class="card-title">完了 — ダウンロード</div>
+    <div class="done-badge">✅ 生成完了</div>
+    <div id="dlList"></div>
+    <button class="reset-btn" onclick="resetAll()">🔄 新しい動画を生成する</button>
+  </div>
+
+</main>
+
+<script>
+// ── 設定 ──────────────────────────────────────────────────────────────────
+// フロントエンドとバックエンドが同じサーバーなら '' のまま。
+// 別々にデプロイする場合は バックエンドの URL に変更。
+const API = '';
+
+// ── 状態 ──────────────────────────────────────────────────────────────────
+let jobId = null;
+let pollId = null;
+
+// ── ドロップゾーン ────────────────────────────────────────────────────────
+function initDrop(zoneId, inputId, nameId, isJacket) {
+  const zone  = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  const name  = document.getElementById(nameId);
+
+  const handle = file => {
+    if (!file) return;
+    zone.classList.add('filled');
+    name.textContent = file.name;
+    if (isJacket) {
+      const r = new FileReader();
+      r.onload = e => {
+        const p = document.getElementById('jacketPreview');
+        p.src = e.target.result;
+        p.style.display = 'block';
+      };
+      r.readAsDataURL(file);
+    }
+  };
+
+  input.addEventListener('change', () => handle(input.files[0]));
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    if (!f) return;
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    input.files = dt.files;
+    handle(f);
+  });
+}
+
+initDrop('audioZone',  'audioFile',  'audioName',  false);
+initDrop('jacketZone', 'jacketFile', 'jacketName', true);
+
+// ── フォーマットチップ ────────────────────────────────────────────────────
+document.querySelectorAll('.fmt-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const cb = chip.querySelector('input');
+    cb.checked = !cb.checked;
+    chip.classList.toggle('on', cb.checked);
+  });
+});
+
+// ── 生成 ─────────────────────────────────────────────────────────────────
+document.getElementById('genBtn').addEventListener('click', async () => {
+  const audio  = document.getElementById('audioFile').files[0];
+  const jacket = document.getElementById('jacketFile').files[0];
+  const fmts   = [...document.querySelectorAll('.fmt-chip input:checked')].map(c => c.value);
+
+  hideErr();
+  if (!audio)        { showErr('音楽ファイルを選択してください。'); return; }
+  if (!jacket)       { showErr('ジャケット画像を選択してください。'); return; }
+  if (!fmts.length)  { showErr('出力フォーマットを1つ以上選択してください。'); return; }
+
+  const fd = new FormData();
+  fd.append('audio',          audio);
+  fd.append('jacket',         jacket);
+  fd.append('title',          document.getElementById('titleInput').value.trim());
+  fd.append('artist',         document.getElementById('artistInput').value.trim() || '七。のAI創作屋');
+  fd.append('formats',        fmts.join(','));
+  fd.append('glow_preset',    document.getElementById('glowColor').value);
+  fd.append('glow_intensity', document.getElementById('glowIntensity').value);
+  fd.append('title_position', document.getElementById('titlePos').value);
+  fd.append('font_size',      document.getElementById('fontSize').value);
+  fd.append('wave_color',     document.getElementById('waveColor').value);
+  fd.append('wave_height',    document.getElementById('waveHeight').value);
+
+  document.getElementById('genBtn').disabled = true;
+  showProg();
+
+  try {
+    const res = await fetch(`${API}/api/generate`, { method: 'POST', body: fd });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`サーバーエラー ${res.status}: ${text}`);
+    }
+    const { job_id } = await res.json();
+    jobId = job_id;
+    pollId = setInterval(poll, 1800);
+  } catch (e) {
+    showErr(e.message);
+    document.getElementById('genBtn').disabled = false;
+    document.getElementById('progressCard').style.display = 'none';
+  }
+});
+
+// ── ポーリング ────────────────────────────────────────────────────────────
+async function poll() {
+  if (!jobId) return;
+  try {
+    const res  = await fetch(`${API}/api/status/${jobId}`);
+    const data = await res.json();
+    onStatus(data);
+  } catch (_) { /* ネットワーク一時切断は無視 */ }
+}
+
+function onStatus(d) {
+  const fill = document.getElementById('progFill');
+  const task = document.getElementById('progTask');
+  const pct  = document.getElementById('progPct');
+  const sub  = document.getElementById('progSub');
+
+  if (d.status === 'done') {
+    clearInterval(pollId); pollId = null;
+    fill.style.width = '100%';
+    task.textContent = '完了!';
+    pct.textContent  = '100%';
+    showDownloads(d.formats);
+    return;
+  }
+  if (d.status === 'error') {
+    clearInterval(pollId); pollId = null;
+    showErr(d.error || '不明なエラーが発生しました。');
+    document.getElementById('genBtn').disabled = false;
+    document.getElementById('progressCard').style.display = 'none';
+    return;
+  }
+  if (d.status === 'processing') {
+    const overall = ((d.current + d.current_pct / 100) / d.total) * 100;
+    fill.style.width = `${overall.toFixed(1)}%`;
+    pct.textContent  = `${overall.toFixed(0)}%`;
+    task.textContent = d.current_label || '処理中...';
+    sub.textContent  = `${d.current + 1} / ${d.total} フォーマット`;
+  }
+}
+
+// ── ダウンロード ──────────────────────────────────────────────────────────
+const FMT_META = {
+  tiktok:  { icon: '📱', name: 'TikTok',         desc: '9:16 · 1080 × 1920' },
+  youtube: { icon: '🖥',  name: 'YouTube 横動画',  desc: '16:9 · 1920 × 1080' },
+  shorts:  { icon: '⚡',  name: 'YouTube Shorts', desc: '9:16 · 1080 × 1920' },
+};
+
+function showDownloads(fmts) {
+  document.getElementById('progressCard').style.display = 'none';
+  document.getElementById('downloadCard').style.display = 'block';
+  const list = document.getElementById('dlList');
+  list.innerHTML = '';
+  fmts.forEach(fmt => {
+    const m = FMT_META[fmt] || { icon: '🎬', name: fmt, desc: '' };
+    const a = document.createElement('a');
+    a.href      = `${API}/api/download/${jobId}/${fmt}`;
+    a.className = 'dl-btn';
+    a.setAttribute('download', '');
+    a.innerHTML = `
+      <span class="dl-icon">${m.icon}</span>
+      <div class="dl-info">
+        <div class="dl-title">${m.name}</div>
+        <div class="dl-size">${m.desc}</div>
+      </div>
+      <span class="dl-arr">⬇</span>
+    `;
+    list.appendChild(a);
+  });
+}
+
+// ── UI ヘルパー ───────────────────────────────────────────────────────────
+function showErr(msg) {
+  const el = document.getElementById('errBox');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function hideErr() { document.getElementById('errBox').style.display = 'none'; }
+
+function showProg() {
+  document.getElementById('progressCard').style.display = 'block';
+  document.getElementById('downloadCard').style.display = 'none';
+  document.getElementById('progFill').style.width = '0%';
+  document.getElementById('progTask').textContent = '開始中...';
+  document.getElementById('progPct').textContent  = '0%';
+  document.getElementById('progSub').textContent  = '';
+}
+
+function resetAll() {
+  if (pollId) { clearInterval(pollId); pollId = null; }
+  jobId = null;
+  document.getElementById('genBtn').disabled = false;
+  document.getElementById('progressCard').style.display = 'none';
+  document.getElementById('downloadCard').style.display = 'none';
+  hideErr();
+  ['audioFile', 'jacketFile'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('audioName').textContent  = '';
+  document.getElementById('jacketName').textContent = '';
+  document.getElementById('audioZone').classList.remove('filled');
+  document.getElementById('jacketZone').classList.remove('filled');
+  document.getElementById('jacketPreview').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
